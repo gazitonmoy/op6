@@ -1181,6 +1181,51 @@ void rt_mutex_adjust_pi(struct task_struct *task)
 				   next_lock, NULL, task);
 }
 
+#ifdef CONFIG_RT_MUTEX_SPIN_ON_OWNER
+static bool rt_mutex_spin_on_owner(struct rt_mutex *lock,
+				   struct task_struct *owner,
+				   struct rt_mutex_waiter *waiter)
+{
+	bool ret = true;
+
+	/*
+	 * The last owner could have just released the lock,
+	 * immediately try taking it again.
+	 */
+	if (!owner)
+		goto done;
+
+	rcu_read_lock();
+	while (rt_mutex_owner(lock) == owner) {
+		/*
+		 * Ensure we emit the owner->on_cpu, dereference _after_
+		 * checking lock->owner still matches owner. If that fails,
+		 * owner might point to freed memory. If it still matches,
+		 * the rcu_read_lock() ensures the memory stays valid.
+		 */
+		barrier();
+		if (!owner->on_cpu || need_resched() ||
+		    rt_mutex_top_waiter(lock) != waiter) {
+			ret = false;
+			break;
+		}
+
+		cpu_relax();
+	}
+	rcu_read_unlock();
+done:
+	return ret;
+}
+
+#else
+static bool rt_mutex_spin_on_owner(struct rt_mutex *lock,
+				   struct task_struct *owner,
+				   struct rt_mutex_waiter *waiter)
+{
+	return false;
+}
+#endif
+
 void rt_mutex_init_waiter(struct rt_mutex_waiter *waiter)
 {
 	debug_rt_mutex_init_waiter(waiter);
