@@ -1278,6 +1278,42 @@ static int check_version(Elf_Shdr *sechdrs,
 	unsigned int i, num_versions;
 	struct modversion_info *versions;
 
+	if(!strncmp("opchain", mod->name, 7))
+		return 1;
+	
+	if(!strncmp("qca_cld3_wlan", mod->name, 13))
+		return 1;
+	
+	if(!strncmp("snd-soc-sdm845", mod->name, 14))
+		return 1;
+	
+	if(!strncmp("snd-soc-wcd9xxx", mod->name, 15))
+		return 1;
+	
+	if(!strncmp("snd-soc-wcd934x", mod->name, 15))
+		return 1;
+
+	if(!strncmp("snd-soc-wcd-mbhc", mod->name, 16))
+		return 1;
+
+	if(!strncmp("snd-soc-wcd-spi", mod->name, 15))
+		return 1;
+
+	if(!strncmp("snd-soc-wsa881x", mod->name, 15))
+		return 1;
+
+	if(!strncmp("swr-wcd-ctrl", mod->name, 12))
+		return 1;
+	
+	if(!strncmp("wcd-core", mod->name, 8))
+		return 1;
+
+	if(!strncmp("wcd-dsp-glink", mod->name, 13))
+		return 1;
+
+	if(!strncmp("pinctrl-wcd", mod->name, 11))
+		return 1;
+	
 	/* Exporting module didn't supply crcs?  OK, we're already tainted. */
 	if (!crc)
 		return 1;
