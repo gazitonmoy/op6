@@ -64,7 +64,6 @@ function make_boot {
 
 function move_boot {
 		mv ~/android/AnyKernel2/zImage ~/android/AnyKernel2/oos/zImage
-		mv ~/android/AnyKernel2/modules ~/android/AnyKernel2/oos/modules
 }
 
 function make_zip {
