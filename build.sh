@@ -51,7 +51,6 @@ function make_kernel {
 }
 
 function make_modules {
-		rm `echo $MODULES_DIR"/*"`
 		find $KERNEL_DIR -name '*.ko' -exec cp -v {} $MODULES_DIR \;
 }
 
@@ -125,7 +124,6 @@ do
 case "$dchoice" in
 	y|Y )
 		make_kernel
-		make_dtb
 		make_modules
 		make_boot
 		move_boot
