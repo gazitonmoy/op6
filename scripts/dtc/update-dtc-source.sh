@@ -3,7 +3,7 @@
 #
 # This script assumes that the dtc and the linux git trees are in the
 # same directory. After building dtc in the dtc directory, it copies the
-# source files and generated source file(s) into the scripts/dtc directory
+# source files and generated source files into the scripts/dtc directory
 # in the kernel and creates a git commit updating them to the new
 # version.
 #
@@ -57,6 +57,10 @@ cd $DTC_LINUX_PATH
 for f in $DTC_SOURCE; do
 	cp ${DTC_UPSTREAM_PATH}/${f} ${f}
 	git add ${f}
+done
+for f in $DTC_GENERATED; do
+	cp ${DTC_UPSTREAM_PATH}/$f ${f}_shipped
+	git add ${f}_shipped
 done
 for f in $LIBFDT_SOURCE; do
        cp ${DTC_UPSTREAM_PATH}/libfdt/${f} libfdt/${f}
