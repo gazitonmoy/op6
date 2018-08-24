@@ -18,7 +18,7 @@ DTBIMAGE="dtb"
 export CROSS_COMPILE=${HOME}/android/Toolchains/Linaro7.3/bin/aarch64-opt-linux-android-
 export CROSS_COMPILE_ARM32=${HOME}/android/Toolchains/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
 #export KBUILD_COMPILER_STRING=$(~/android/Toolchains/clang/clang-r328903/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
-DEFCONFIG="smurflinaro_defconfig"
+DEFCONFIG="smurf_defconfig"
 
 # Kernel Details
 VER=".1.6.0.linaro."
