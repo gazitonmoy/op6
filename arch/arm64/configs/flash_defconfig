@@ -51,8 +51,6 @@ CONFIG_MODULE_UNLOAD=y
 CONFIG_MODULE_FORCE_UNLOAD=y
 CONFIG_MODVERSIONS=y
 CONFIG_PARTITION_ADVANCED=y
-<<<<<<< HEAD
-=======
 # CONFIG_ACORN_PARTITION is not set
 # CONFIG_AIX_PARTITION is not set
 # CONFIG_OSF_PARTITION is not set
@@ -665,12 +663,6 @@ CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
 CONFIG_CRYPTO_CRC32_ARM64=y
 CONFIG_QMI_ENCDEC=y
-<<<<<<< HEAD:arch/arm64/configs/flash_defconfig
-<<<<<<< HEAD:arch/arm64/configs/flash_defconfig
-=======
-=======
->>>>>>> 1f512ef... add tripndroid:arch/arm64/configs/smurf_defconfig
-
 #Smurf
 CONFIG_ADRENO_IDLER=y
 CONFIG_IOSCHED_NOOP=y
@@ -691,12 +683,7 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 CONFIG_BOEFFLA_WL_BLOCKER=y
 CONFIG_ASYNC_FSYNC=y
 CONFIG_DYNAMIC_FSYNC=y
-<<<<<<< HEAD:arch/arm64/configs/flash_defconfig
 # CONFIG_QMI_ENCDEC_DEBUG is not set
-=======
 CONFIG_NETFILTER_XT_TARGET_HL=y
 CONFIG_STATE_NOTIFIER=y
 CONFIG_LCD_NOTIFY=y
->>>>>>> 1f512ef... add tripndroid:arch/arm64/configs/smurf_defconfig
-
->>>>>>> 94b11ba... Dynamic Fsync 2.1 / Async Fsync:arch/arm64/configs/smurf_defconfig
