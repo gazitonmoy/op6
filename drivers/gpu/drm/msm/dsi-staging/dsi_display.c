@@ -41,7 +41,6 @@
 #include <linux/cpufreq.h>
 #include <linux/pm_wakeup.h>
 
-#include <linux/msm_drm_notify.h>
 #include <linux/notifier.h>
 
 #define BIG_CPU_NUMBER 4
