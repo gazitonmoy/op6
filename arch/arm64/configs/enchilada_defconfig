@@ -1,4 +1,4 @@
-CONFIG_LOCALVERSION="SmurfKernel 2.0.46.custom"
+CONFIG_LOCALVERSION="SmurfKernel_2_0_47_custom"
 # CONFIG_LOCALVERSION_AUTO is not set
 # CONFIG_FHANDLE is not set
 CONFIG_AUDIT=y
