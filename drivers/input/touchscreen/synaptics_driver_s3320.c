@@ -1589,6 +1589,7 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 		input_report_key(ts->input_dev, keyCode, 0);
 		input_sync(ts->input_dev);
 	}else{
+		mutex_lock(&ts->mutex);
 		ret = i2c_smbus_read_i2c_block_data( ts->client, F12_2D_CTRL20, 3, &(reportbuf[0x0]) );
 		ret = reportbuf[2] & 0x20;
 		if(ret == 0)
@@ -1596,6 +1597,7 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 		ret = i2c_smbus_write_i2c_block_data( ts->client, F12_2D_CTRL20, 3, &(reportbuf[0x0]) ); //enable gesture
 		if (ret < 0)
 			TPD_ERR("%s :Failed to write report buffer\n", __func__);
+		mutex_unlock(&ts->mutex);
 	}
 	TPD_DEBUG("%s end!\n", __func__);
 }
@@ -1837,9 +1839,7 @@ void int_touch(void)
 
 #ifdef SUPPORT_GESTURE
 	if (ts->in_gesture_mode == 1 && ts->is_suspended == 1) {
-		mutex_lock(&ts->mutex);
 		gesture_judge(ts);
-		mutex_unlock(&ts->mutex);
 	}
 #endif
 
@@ -2019,7 +2019,6 @@ static irqreturn_t synaptics_irq_thread_fn(int irq, void *dev_id)
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)dev_id;
     touch_disable(ts);
 	synaptics_ts_work_func(&ts->report_work);
- END:
 	pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 
 	return IRQ_HANDLED;
@@ -6578,7 +6577,7 @@ static int msm_drm_notifier_callback(
 
 static int __init tpd_driver_init(void)
 {
-	struct sched_param param = { .sched_priority = 16 };	
+	struct sched_param param = { .sched_priority = 6 };	
 	TPD_ERR("%s enter\n", __func__);
 	if( i2c_add_driver(&tpd_i2c_driver)!= 0 ){
 		TPD_ERR("unable to add i2c driver.\n");
