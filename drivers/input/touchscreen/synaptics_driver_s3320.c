@@ -1589,7 +1589,6 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 		input_report_key(ts->input_dev, keyCode, 0);
 		input_sync(ts->input_dev);
 	}else{
-		mutex_lock(&ts->mutex);
 		ret = i2c_smbus_read_i2c_block_data( ts->client, F12_2D_CTRL20, 3, &(reportbuf[0x0]) );
 		ret = reportbuf[2] & 0x20;
 		if(ret == 0)
@@ -1597,7 +1596,6 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 		ret = i2c_smbus_write_i2c_block_data( ts->client, F12_2D_CTRL20, 3, &(reportbuf[0x0]) ); //enable gesture
 		if (ret < 0)
 			TPD_ERR("%s :Failed to write report buffer\n", __func__);
-		mutex_unlock(&ts->mutex);
 	}
 	TPD_DEBUG("%s end!\n", __func__);
 }
@@ -1839,7 +1837,9 @@ void int_touch(void)
 
 #ifdef SUPPORT_GESTURE
 	if (ts->in_gesture_mode == 1 && ts->is_suspended == 1) {
+		mutex_lock(&ts->mutex);
 		gesture_judge(ts);
+		mutex_unlock(&ts->mutex);
 	}
 #endif
 
@@ -4893,7 +4893,6 @@ static int init_synaptics_proc(void)
 {
 	int ret = 0;
 	struct proc_dir_entry *prEntry_tmp  = NULL;
-
 	prEntry_tp = proc_mkdir("touchpanel", NULL);
 	if( prEntry_tp == NULL ){
 		ret = -ENOMEM;

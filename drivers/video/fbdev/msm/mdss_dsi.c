@@ -4112,7 +4112,7 @@ static int mdss_dsi_irq_init(struct device *dev, int irq_no,
 	int ret;
 
 	ret = devm_request_irq(dev, irq_no, mdss_dsi_isr,
-				IRQF_PERF_CRITICAL, "DSI", ctrl);
+				0, "DSI", ctrl);
 	if (ret) {
 		pr_err("msm_dsi_irq_init request_irq() failed!\n");
 		return ret;
