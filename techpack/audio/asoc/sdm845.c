@@ -4062,7 +4062,6 @@ static void *def_tavil_mbhc_cal(void)
 	btn_high[5] = 600;
 	btn_high[6] = 600;
 	btn_high[7] = 600;
-
 	
 
 	return tavil_wcd_cal;
@@ -6891,7 +6890,6 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 //suzhiguang,for config smartpa dailink.
     int ret;
     const char *smartpa_type;
-
 
 	match = of_match_node(sdm845_asoc_machine_of_match, dev->of_node);
 	if (!match) {
