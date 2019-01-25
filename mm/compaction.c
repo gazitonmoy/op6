@@ -1927,8 +1927,8 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 							cc.classzone_idx);
 	count_vm_event(KCOMPACTD_WAKE);
 
-	cpu_input_boost_kick();
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+	cpu_input_boost_kick_flex();
+	devfreq_boost_kick_flex(DEVFREQ_MSM_CPUBW);
 
 	for (zoneid = 0; zoneid <= cc.classzone_idx; zoneid++) {
 		int status;
