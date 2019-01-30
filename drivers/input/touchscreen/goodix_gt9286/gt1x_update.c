@@ -236,16 +236,6 @@ int gt1x_auto_update_proc(void *data)
 	int ret;
 	char *filename;
 	u8 config[GTP_CONFIG_ORG_LENGTH + GTP_CONFIG_EXT_LENGTH] = { 0 };
-	int bootmode;
-
-	bootmode = get_boot_mode();
-	GTP_INFO("gt1x_auto_update bootmode %d !", bootmode);
-	if ((bootmode == MSM_BOOT_MODE__FACTORY)
-		|| (bootmode == MSM_BOOT_MODE__RF)
-		|| (bootmode == MSM_BOOT_MODE__WLAN)) {
-		GTP_INFO("gt1x_auto_update disable tp firmware update");
-		return 0;
-	}
 
 #if GTP_HEADER_FW_UPDATE
 	GTP_INFO("Start auto update thread from header...");
