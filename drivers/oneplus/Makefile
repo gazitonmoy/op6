@@ -7,4 +7,4 @@ obj-$(CONFIG_OEM_TRACE_SUPPORT) += oem_trace.o
 obj-y += boot_mode.o
 endif
 
-obj-y += coretech/
+#obj-y += coretech/

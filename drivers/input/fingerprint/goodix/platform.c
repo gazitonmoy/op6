@@ -135,13 +135,6 @@ int gf_parse_dts(struct gf_dev* gf_dev)
 	if (rc)
 		pr_err("Regulator vdd enable failed rc=%d\n", rc);
 
-	if (get_boot_mode() ==  MSM_BOOT_MODE__FACTORY)
-	{
-		rc = regulator_disable(gf_dev->vdd_3v2);
-		if (rc)
-			pr_err("Regulator vdd disable failed rc=%d\n", rc);
-	}
-
 err_irq:
 	devm_gpio_free(dev, gf_dev->reset_gpio);
 err_reset:
