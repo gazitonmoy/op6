@@ -580,6 +580,13 @@ config MAX_BOOST_STUNE_OFFSET
 	  accepted for testing purposes. A value of 0 disables SchedTune
 	  boosting for this level.
 
+config STUNE_BOOST_EXTENDER_MS
+	int "Foreground app schedtune max extend duration"
+	depends on DYNAMIC_STUNE_BOOST
+	default '1500'
+	help
+	  Extends the stune boost duration to a given timespan
+
 endif
 
 comment "CPU frequency scaling drivers"

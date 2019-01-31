@@ -32,11 +32,13 @@ static __read_mostly unsigned short input_stune_boost_offset = CONFIG_INPUT_BOOS
 static __read_mostly unsigned short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short general_stune_boost_offset = CONFIG_GENERAL_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
+static __read_mostly unsigned short stune_boost_extender_ms = CONFIG_STUNE_BOOST_EXTENDER_MS;
 module_param(dynamic_stune_boost, short, 0644);
 module_param(input_stune_boost_offset, short, 0644);
 module_param(max_stune_boost_offset, short, 0644);
 module_param(general_stune_boost_offset, short, 0644);
 module_param(flex_stune_boost_offset, short, 0644);
+module_param(stune_boost_extender_ms, short, 0644);
 #endif
 
 module_param(input_boost_freq_lp, uint, 0644);
@@ -69,6 +71,7 @@ struct boost_drv {
 	struct delayed_work general_unboost;
 	struct kthread_work flex_boost;
 	struct delayed_work flex_unboost;
+	struct delayed_work stune_extender_unboost;
 	struct notifier_block cpu_notif;
 	struct notifier_block msm_drm_notif;
 	atomic64_t max_boost_expires;
@@ -77,6 +80,7 @@ struct boost_drv {
 	atomic_t general_boost_dur;
 	atomic64_t flex_boost_expires;
 	atomic_t flex_boost_dur;
+	atomic_t stune_extender_dur;
 	atomic_t state;
 	int cpu;
 };
@@ -185,6 +189,7 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->max_boost_dur, duration_ms);
+	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->max_boost);
 }
 
@@ -224,6 +229,7 @@ static void __cpu_input_boost_kick_general(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->general_boost_dur, duration_ms);
+	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->general_boost);
 }
 
@@ -258,6 +264,7 @@ static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 		new_expires) != curr_expires);
 
 	atomic_set(&b->flex_boost_dur, flex_boost_duration);
+	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->flex_boost);
 }
 
@@ -289,6 +296,8 @@ static void input_boost_worker(struct kthread_work *work)
 	if (!do_stune_boost("top-app", dynamic_stune_boost + input_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
+	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
+		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
 	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
 }
@@ -299,12 +308,7 @@ static void input_unboost_worker(struct work_struct *work)
 		container_of(to_delayed_work(work), typeof(*b), input_unboost);
 
 	clear_boost_bit(b, INPUT_BOOST);
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (stune_boost_active) {
-		reset_stune_boost("top-app", boost_slot);
-		stune_boost_active = false;
-	}
-#endif
+
 	update_online_cpu_policy();
 }
 
@@ -320,6 +324,8 @@ static void max_boost_worker(struct kthread_work *work)
 	if (!do_stune_boost("top-app", dynamic_stune_boost + max_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
+	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
+		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
 	queue_delayed_work(system_power_efficient_wq, &b->max_unboost,
 		msecs_to_jiffies(atomic_read(&b->max_boost_dur)));
 }
@@ -330,12 +336,7 @@ static void max_unboost_worker(struct work_struct *work)
 		container_of(to_delayed_work(work), typeof(*b), max_unboost);
 
 	clear_boost_bit(b, WAKE_BOOST | MAX_BOOST);
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (stune_boost_active) {
-		reset_stune_boost("top-app", boost_slot);
-		stune_boost_active = false;
-	}
-#endif
+
 	update_online_cpu_policy();
 }
 
@@ -351,6 +352,8 @@ static void general_boost_worker(struct kthread_work *work)
 	if (!do_stune_boost("top-app", dynamic_stune_boost + general_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
+	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
+		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
 	queue_delayed_work(system_power_efficient_wq, &b->general_unboost,
 		msecs_to_jiffies(atomic_read(&b->general_boost_dur)));
 }
@@ -359,12 +362,7 @@ static void general_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b =
 		container_of(to_delayed_work(work), typeof(*b), general_unboost);
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (stune_boost_active) {
-		reset_stune_boost("top-app", boost_slot);
-		stune_boost_active = false;
-	}
-#endif
+
 	clear_boost_bit(b, GENERAL_BOOST);
 	update_online_cpu_policy();
 }
@@ -381,6 +379,8 @@ static void flex_boost_worker(struct kthread_work *work)
 	if (!do_stune_boost("top-app", dynamic_stune_boost + flex_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
+	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
+		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
 	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
 }
@@ -389,14 +389,21 @@ static void flex_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b =
 		container_of(to_delayed_work(work), typeof(*b), flex_unboost);
+
+	clear_boost_bit(b, FLEX_BOOST);
+	update_online_cpu_policy();
+}
+
+static void stune_extender_unboost_worker(struct work_struct *work)
+{
+	struct boost_drv *b =
+		container_of(to_delayed_work(work), typeof(*b), stune_extender_unboost);
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	if (stune_boost_active) {
 		reset_stune_boost("top-app", boost_slot);
 		stune_boost_active = false;
 	}
 #endif
-	clear_boost_bit(b, FLEX_BOOST);
-	update_online_cpu_policy();
 }
 
 static int cpu_notifier_cb(struct notifier_block *nb,
@@ -594,6 +601,7 @@ static int __init cpu_input_boost_init(void)
 	INIT_DELAYED_WORK(&b->general_unboost, general_unboost_worker);
 	kthread_init_work(&b->flex_boost, flex_boost_worker);
 	INIT_DELAYED_WORK(&b->flex_unboost, flex_unboost_worker);
+	INIT_DELAYED_WORK(&b->stune_extender_unboost, stune_extender_unboost_worker);
 	atomic_set(&b->state, 0);
 
 	b->cpu_notif.notifier_call = cpu_notifier_cb;
