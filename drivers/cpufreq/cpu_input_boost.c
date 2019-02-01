@@ -293,6 +293,7 @@ static void input_boost_worker(struct kthread_work *work)
 		update_online_cpu_policy();
 	}
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + input_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
@@ -321,6 +322,7 @@ static void max_boost_worker(struct kthread_work *work)
 		update_online_cpu_policy();
 	}
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + max_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
@@ -349,6 +351,7 @@ static void general_boost_worker(struct kthread_work *work)
 		update_online_cpu_policy();
 	}
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + general_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
@@ -376,6 +379,7 @@ static void flex_boost_worker(struct kthread_work *work)
 		update_online_cpu_policy();
 	}
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + flex_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
 #endif
@@ -404,6 +408,7 @@ static void stune_extender_unboost_worker(struct work_struct *work)
 		stune_boost_active = false;
 	}
 #endif
+	
 }
 
 static int cpu_notifier_cb(struct notifier_block *nb,
