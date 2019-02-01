@@ -96,7 +96,7 @@ export SUBARCH=arm64
 export KBUILD_BUILD_USER=pappschlumpf
 export KBUILD_BUILD_HOST=Gargamel
 export OS="9.0.0"
-export SPL="2025-12"
+export SPL="2019-01"
 
 
 echo
