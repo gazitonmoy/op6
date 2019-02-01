@@ -3992,6 +3992,16 @@ static ssize_t synaptics_update_fw_store(struct device *dev,
 	struct synaptics_ts_data *ts = dev_get_drvdata(dev);
 	unsigned long val;
 	int rc;
+	int bootmode;
+
+	bootmode = get_boot_mode();
+	TPD_ERR("synaptics bootmode %d  !\n", bootmode);
+	if ((bootmode == MSM_BOOT_MODE__FACTORY)
+		|| (bootmode == MSM_BOOT_MODE__RF)
+		|| (bootmode == MSM_BOOT_MODE__WLAN)) {
+		TPD_ERR("synaptics disable tp update firmware update\n");
+		return size;
+	}
 
 	if (ts->is_suspended && ts->support_hw_poweroff){
 		TPD_ERR("power off firmware abort!\n");
@@ -6034,6 +6044,7 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 	uint8_t buf[8];
 	unsigned long int  CURRENT_FIRMWARE_ID = 0;
 	uint32_t bootloader_mode;
+	uint32_t bootmode;
 	int cpu;
 
 	TPD_ERR("%s  is called\n",__func__);
@@ -6392,6 +6403,16 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 #endif
 
 	TPDTM_DMESG("synaptics_ts_probe 3203: normal end\n");
+
+	bootmode = get_boot_mode();
+	TPD_ERR("synaptics bootmode %d  !\n", bootmode);
+	if ((bootmode == MSM_BOOT_MODE__FACTORY)
+		|| (bootmode == MSM_BOOT_MODE__RF)
+		|| (bootmode == MSM_BOOT_MODE__WLAN)) {
+		touch_disable(ts);
+		TPD_ERR("synaptics ftm mode disable int \n");
+		return 0;
+	}
 
 	return 0;
 
