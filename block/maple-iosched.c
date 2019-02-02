@@ -273,6 +273,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	int blank;
 
 	blank = *(int *)(evdata->data);	
+	mdata->display_on=true;
 
  	if (((blank == MSM_DRM_BLANK_POWERDOWN)
 		&& (event == MSM_DRM_EARLY_EVENT_BLANK))
@@ -437,7 +438,6 @@ static int __init maple_init(void)
 {
 	/* Register elevator */
 	elv_register(&iosched_maple);
-
 	return 0;
 }
 
