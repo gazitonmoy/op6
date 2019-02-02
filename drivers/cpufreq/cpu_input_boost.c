@@ -80,7 +80,6 @@ struct boost_drv {
 	atomic_t general_boost_dur;
 	atomic64_t flex_boost_expires;
 	atomic_t flex_boost_dur;
-	atomic_t stune_extender_dur;
 	atomic_t state;
 	int cpu;
 };
@@ -189,7 +188,6 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->max_boost_dur, duration_ms);
-	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->max_boost);
 }
 
@@ -229,7 +227,6 @@ static void __cpu_input_boost_kick_general(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->general_boost_dur, duration_ms);
-	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->general_boost);
 }
 
@@ -264,7 +261,6 @@ static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 		new_expires) != curr_expires);
 
 	atomic_set(&b->flex_boost_dur, flex_boost_duration);
-	atomic_set(&b->stune_extender_dur, stune_boost_extender_ms);
 	kthread_queue_work(&b->worker, &b->flex_boost);
 }
 
@@ -292,15 +288,15 @@ static void input_boost_worker(struct kthread_work *work)
 		set_boost_bit(b, INPUT_BOOST);
 		update_online_cpu_policy();
 	}
+	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
+		msecs_to_jiffies(input_boost_duration));
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + input_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
-#endif
 	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
-	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
-		msecs_to_jiffies(input_boost_duration));
+		msecs_to_jiffies(stune_boost_extender_ms));
+#endif
 }
 
 static void input_unboost_worker(struct work_struct *work)
@@ -321,15 +317,15 @@ static void max_boost_worker(struct kthread_work *work)
 		set_boost_bit(b, MAX_BOOST);
 		update_online_cpu_policy();
 	}
+	queue_delayed_work(system_power_efficient_wq, &b->max_unboost,
+		msecs_to_jiffies(atomic_read(&b->max_boost_dur)));
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + max_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
-#endif
 	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
-	queue_delayed_work(system_power_efficient_wq, &b->max_unboost,
-		msecs_to_jiffies(atomic_read(&b->max_boost_dur)));
+		msecs_to_jiffies(stune_boost_extender_ms));
+#endif
 }
 
 static void max_unboost_worker(struct work_struct *work)
@@ -350,15 +346,15 @@ static void general_boost_worker(struct kthread_work *work)
 		set_boost_bit(b, GENERAL_BOOST);
 		update_online_cpu_policy();
 	}
+	queue_delayed_work(system_power_efficient_wq, &b->general_unboost,
+		msecs_to_jiffies(atomic_read(&b->general_boost_dur)));
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + general_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
-#endif
 	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
-	queue_delayed_work(system_power_efficient_wq, &b->general_unboost,
-		msecs_to_jiffies(atomic_read(&b->general_boost_dur)));
+		msecs_to_jiffies(stune_boost_extender_ms));
+#endif
 }
 
 static void general_unboost_worker(struct work_struct *work)
@@ -378,15 +374,15 @@ static void flex_boost_worker(struct kthread_work *work)
 		set_boost_bit(b, FLEX_BOOST);
 		update_online_cpu_policy();
 	}
+	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
+		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
 	if (!do_stune_boost("top-app", dynamic_stune_boost + flex_stune_boost_offset, &boost_slot))
 		stune_boost_active = true;
-#endif
 	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(atomic_read(&b->stune_extender_dur)));
-	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
-		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
+		msecs_to_jiffies(stune_boost_extender_ms));
+#endif
 }
 
 static void flex_unboost_worker(struct work_struct *work)
@@ -409,6 +405,32 @@ static void stune_extender_unboost_worker(struct work_struct *work)
 	}
 #endif
 	
+}
+
+static void sleep_boost(void)
+{
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	if (!do_stune_boost("top-app", -15, &boost_slot))
+		stune_boost_active = true;
+	if (!do_stune_boost("foreground", -15, &boost_slot))
+		stune_boost_active = true;
+	if (!do_stune_boost("background", -15, &boost_slot))
+		stune_boost_active = true;
+#endif
+}
+
+static void sleep_unboost(void)
+{
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	if (stune_boost_active) {
+		reset_stune_boost("top-app", boost_slot);
+		stune_boost_active = false;
+		reset_stune_boost("foreground", boost_slot);
+		stune_boost_active = false;
+		reset_stune_boost("background", boost_slot);
+		stune_boost_active = false;
+	}
+#endif
 }
 
 static int cpu_notifier_cb(struct notifier_block *nb,
@@ -464,12 +486,14 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (blank == MSM_DRM_BLANK_UNBLANK_CUST) {
+		sleep_unboost();
 		set_boost_bit(b, SCREEN_AWAKE);
 		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, 0);
 
 	} else {
 		clear_boost_bit(b, SCREEN_AWAKE);
 		unboost_all_cpus(b);
+		sleep_boost();
 	}
 
 	return NOTIFY_OK;
@@ -634,6 +658,7 @@ static int __init cpu_input_boost_init(void)
 
 	/* Allow global boost config access for external boosts */
 	boost_drv_g = b;
+	set_boost_bit(b, SCREEN_AWAKE);
 
 	return 0;
 
