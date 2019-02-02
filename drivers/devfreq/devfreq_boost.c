@@ -331,7 +331,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 {
 	struct df_boost_drv *d = container_of(nb, typeof(*d), msm_drm_notif);
 	struct msm_drm_notifier *evdata = data;
-	bool screen_awake;
+	bool screen_awake=true;
 	int blank;
 
 	blank = *(int *)(evdata->data);	
