@@ -587,23 +587,17 @@ static int __init cpu_input_boost_init(void)
 	if (!b)
 		return -ENOMEM;
 
-<<<<<<< HEAD
-	b->wq = alloc_workqueue("cpu_input_boost_wq", WQ_HIGHPRI, 0);
-	if (!b->wq) {
-		ret = -ENOMEM;
-=======
 	kthread_init_worker(&b->worker);
 	b->worker_thread = kthread_run(kthread_worker_fn, &b->worker,
 				       "cpu_input_boost_thread");
 	if (IS_ERR(b->worker_thread)) {
 		ret = PTR_ERR(b->worker_thread);
 		pr_err("Failed to start kworker, err: %d\n", ret);
->>>>>>> 880037420b811... cpu_input_boost: [FIX] Rework scheduling setup
 		goto free_b;
 	}
 
 	ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
-	if (!ret)
+	if (ret)
 		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 
 	/* Init the cpumask */
@@ -623,7 +617,7 @@ static int __init cpu_input_boost_init(void)
 	INIT_DELAYED_WORK(&b->max_unboost, max_unboost_worker);
 	kthread_init_work(&b->general_boost, general_boost_worker);
 	INIT_DELAYED_WORK(&b->general_unboost, general_unboost_worker);
-	INIT_WORK(&b->flex_boost, flex_boost_worker);
+	kthread_init_work(&b->flex_boost, flex_boost_worker);
 	INIT_DELAYED_WORK(&b->flex_unboost, flex_unboost_worker);
 	INIT_DELAYED_WORK(&b->stune_extender_unboost, stune_extender_unboost_worker);
 	atomic_set(&b->state, 0);
