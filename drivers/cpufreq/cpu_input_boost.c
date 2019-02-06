@@ -290,8 +290,10 @@ static void input_boost_worker(struct work_struct *work)
 		msecs_to_jiffies(input_boost_duration));
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
-	if (!do_stune_boost("top-app", dynamic_stune_boost + input_stune_boost_offset, &boost_slot))
+	if (!do_stune_boost("top-app", dynamic_stune_boost + input_stune_boost_offset, &boost_slot)) {
 		stune_boost_active = true;
+		pr_info ("input_extender_on");
+	}
 	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
 		msecs_to_jiffies(stune_boost_extender_ms));
 #endif
@@ -346,13 +348,6 @@ static void general_boost_worker(struct work_struct *work)
 	}
 	queue_delayed_work(system_power_efficient_wq, &b->general_unboost,
 		msecs_to_jiffies(atomic_read(&b->general_boost_dur)));
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	cancel_delayed_work_sync(&b->stune_extender_unboost);
-	if (!do_stune_boost("top-app", dynamic_stune_boost + general_stune_boost_offset, &boost_slot))
-		stune_boost_active = true;
-	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(stune_boost_extender_ms));
-#endif
 }
 
 static void general_unboost_worker(struct work_struct *work)
@@ -374,13 +369,6 @@ static void flex_boost_worker(struct work_struct *work)
 	}
 	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	cancel_delayed_work_sync(&b->stune_extender_unboost);
-	if (!do_stune_boost("top-app", dynamic_stune_boost + flex_stune_boost_offset, &boost_slot))
-		stune_boost_active = true;
-	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
-		msecs_to_jiffies(stune_boost_extender_ms));
-#endif
 }
 
 static void flex_unboost_worker(struct work_struct *work)
@@ -400,6 +388,7 @@ static void stune_extender_unboost_worker(struct work_struct *work)
 	if (stune_boost_active) {
 		reset_stune_boost("top-app", boost_slot);
 		stune_boost_active = false;
+		pr_info ("input_extender_off");
 	}
 #endif
 	
