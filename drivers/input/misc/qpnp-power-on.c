@@ -1158,6 +1158,9 @@ int qpnp_powerkey_state_check(struct qpnp_pon *pon,int up)
 {
 	int rc =0;
 
+	if (get_boot_mode() !=	MSM_BOOT_MODE__NORMAL)
+		return 0;
+
 	if ( up ) {
 		rc = atomic_read(&pon->press_count);
 		if (rc < 1) {
