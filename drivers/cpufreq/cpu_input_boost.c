@@ -617,7 +617,7 @@ static int __init cpu_input_boost_init(void)
 		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 
 	/* Init the cpumask */
-	for (i = 0; i <= 7; i++)
+	for (i = 0; i <= 2; i++)
 		cpumask_set_cpu(i, &sys_bg_mask);
 
 	/* Bind it to the cpumask */
