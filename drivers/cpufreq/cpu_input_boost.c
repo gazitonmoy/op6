@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 
 unsigned long last_input_jiffies;
+unsigned int kgsl_cpu;
 
 static __read_mostly unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static __read_mostly unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
@@ -331,7 +332,6 @@ static void input_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), input_unboost);
-	u32 state = get_boost_state(b);
 
 	clear_boost_bit(b, INPUT_BOOST);
 	update_online_cpu_policy();
@@ -453,9 +453,17 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 
 	/* Boost CPU to max frequency for max boost */
 	if (state & MAX_BOOST) {
-		if (b->cpu = policy->cpu) {
+		if (b->cpu == policy->cpu) {
 			policy->min = policy->max;
 			b->cpu = 9;
+			return NOTIFY_OK;
+		}
+	}
+
+	if (state & FLEX_BOOST) {
+		if (kgsl_cpu == policy->cpu) {
+			boost_freq = get_boost_freq(b, policy->cpu, state);
+			policy->min = min(policy->max, boost_freq);
 			return NOTIFY_OK;
 		}
 	}
@@ -464,7 +472,8 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 	 * Boost to policy->max if the boost frequency is higher. When
 	 * unboosting, set policy->min to the absolute min freq for the CPU.
 	 */
-	if (state & INPUT_BOOST || state & GENERAL_BOOST || state & FLEX_BOOST) {
+	//if (state & INPUT_BOOST || state & GENERAL_BOOST || state & FLEX_BOOST) {
+	if (state & INPUT_BOOST || state & GENERAL_BOOST) {
 		boost_freq = get_boost_freq(b, policy->cpu, state);
 		policy->min = min(policy->max, boost_freq);
 	} else {

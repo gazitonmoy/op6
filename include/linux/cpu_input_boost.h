@@ -6,6 +6,8 @@
 #define _CPU_INPUT_BOOST_H_
 
 #ifdef CONFIG_CPU_INPUT_BOOST
+extern unsigned long last_input_jiffies;
+extern unsigned int kgsl_cpu;
 void cpu_input_boost_kick(void);
 void cpu_input_boost_kick_max(unsigned int duration_ms);
 void cluster_input_boost_kick_max(unsigned int duration_ms, int cpu);

@@ -31,6 +31,7 @@
 #include <linux/compat.h>
 #include <linux/ctype.h>
 #include <linux/mm.h>
+#include <linux/cpu_input_boost.h>
 #include <asm/cacheflush.h>
 
 #include "kgsl.h"
@@ -4784,9 +4785,11 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 				PM_QOS_REQ_AFFINE_CORES;
 		cpumask_empty(&device->pwrctrl.l2pc_cpus_qos.cpus_affine);
 		for_each_possible_cpu(cpu) {
-			if ((1 << cpu) & device->pwrctrl.l2pc_cpus_mask)
+			if ((1 << cpu) & device->pwrctrl.l2pc_cpus_mask) {
 				cpumask_set_cpu(cpu, &device->pwrctrl.
 						l2pc_cpus_qos.cpus_affine);
+				kgsl_cpu=cpu;
+			}
 		}
 
 		pm_qos_add_request(&device->pwrctrl.l2pc_cpus_qos,
