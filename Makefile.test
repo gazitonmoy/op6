@@ -1,6 +1,6 @@
 VERSION = 4
 PATCHLEVEL = 9
-SUBLEVEL = 145
+SUBLEVEL = 155
 EXTRAVERSION =
 NAME = Roaring Lionus
 
@@ -116,8 +116,6 @@ export quiet Q KBUILD_VERBOSE
 # KBUILD_SRC is set on invocation of make in OBJ directory
 # KBUILD_SRC is not intended to be used by the regular user (for now)
 ifeq ($(KBUILD_SRC),)
-
-export CCACHE=ccache
 
 # OK, Make called in directory where kernel src resides
 # Do we want to locate output files in a separate directory?
@@ -303,8 +301,8 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
 
-HOSTCC       = $(CCACHE) gcc
-HOSTCXX      = $(CCACHE) g++
+HOSTCC       = gcc
+HOSTCXX      = g++
 HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
 HOSTCXXFLAGS = -O2
 
@@ -342,10 +340,25 @@ export KBUILD_CHECKSRC KBUILD_SRC KBUILD_EXTMOD
 scripts/Kbuild.include: ;
 include scripts/Kbuild.include
 
+ifeq ($(cc-name),clang)
+POLLY_FLAGS	:= -mllvm -polly \
+		   -mllvm -polly-run-dce \
+		   -mllvm -polly-run-inliner \
+		   -mllvm -polly-opt-fusion=max \
+		   -mllvm -polly-ast-use-context \
+		   -mllvm -polly-detect-keep-going \
+		   -mllvm -polly-vectorizer=stripmine \
+		   -mllvm -polly-opt-maximize-bands=yes \
+		   -mllvm -polly-opt-simplify-deps=no \
+		   -mllvm -polly-rtc-max-arrays-per-group=40
+		   
+OPT_FLAGS	:= -mcpu=kryo -funsafe-math-optimizations -fopenmp $(POLLY_FLAGS)
+endif
+
 # Make variables (CC, etc...)
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld.bfd
-CC		= $(CCACHE) $(CROSS_COMPILE)gcc
+CC		= $(CROSS_COMPILE)gcc
 LDGOLD		= $(CROSS_COMPILE)ld.gold
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
@@ -371,9 +384,6 @@ CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 LDFLAGS_vmlinux =
 
-#OPT_FLAGS	:= -funsafe-math-optimizations -ffast-math \
-		   -fvectorize -fslp-vectorize -fopenmp
-
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE    := \
 		-I$(srctree)/arch/$(hdr-arch)/include/uapi \
@@ -395,13 +405,14 @@ LINUXINCLUDE	+= $(filter-out $(LINUXINCLUDE),$(USERINCLUDE))
 
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-		   -fno-strict-aliasing -fno-common -fshort-wchar \
-		   -Werror-implicit-function-declaration \
-		   -Wno-format-security -ffast-math \
-		   -std=gnu89
+                  -fno-strict-aliasing -fno-common -fshort-wchar \
+                  -Werror-implicit-function-declaration \
+                  -Wno-format-security \
+		  -fdiagnostics-color=always -fdiagnostics-show-option \
+                  -std=gnu89 $(call cc-option,-fno-PIE)
 
-KBUILD_CFLAGS +=  -fdiagnostics-color=always -fdiagnostics-show-option \
-                  -Wno-unused-variable -Wno-unused-function \
+## Global Additional CFLAGS:
+KBUILD_CFLAGS +=  -Wno-unused-variable -Wno-unused-function \
                   -Wno-unused-label -Wno-logical-not-parentheses \
                   -Wno-incompatible-pointer-types -Wno-parentheses \
                   -Wno-sizeof-pointer-memaccess -Wno-nonnull \
@@ -412,22 +423,27 @@ ifneq ($(cc-name),clang)
 KBUILD_CFLAGS +=  -Wno-error=implicit-function-declaration -Wno-implicit-function-declaration \
 		  -Wno-error=incompatible-pointer-types -Wno-pointer-sign \
 		  --Wno-missing-attributes -Wno-sizeof-pointer-memaccess \
-		  -Wno-shift-overflow
+		  -Wno-shift-overflow -Wno-switch-unreachable -Wno-maybe-uninitialized \
+                  -Wno-array-bounds -Wno-duplicate-decl-specifier
 
-KBUILD_CFLAGS +=  -Wno-switch-unreachable -Wno-maybe-uninitialized \
-                  -Wno-array-bounds -Wno-duplicate-decl-specifier \
-		  -Wno-stringop-overflow -Wno-misleading-indentation \
+KBUILD_CFLAGS +=  -Wno-stringop-overflow -Wno-misleading-indentation \
 		  -Wno-unused-const-variable -Wno-format-truncation \
 		  -Wno-int-in-bool-context -Wno-format-overflow \
 		  -Wno-tautological-compare -Wno-error=misleading-indentation \
-                  -Wno-memset-transposed-args -Wno-bool-compare \
-		  -Wno-logical-not-parentheses -Wno-discarded-array-qualifiers \
+                  -Wno-memset-transposed-args -Wno-bool-compare
+
+KBUILD_CFLAGS +=  -Wno-logical-not-parentheses -Wno-discarded-array-qualifiers \
 		  -Wno-attributes -Wno-packed-not-aligned -Wno-stringop-truncation \
 		  -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53 \
 		  -Wno-bool-operation -Wno-memset-elt-size
+
+KBUILD_CFLAGS +=  -floop-nest-optimize -fgraphite-identity -fgcse-sm \
+		  -ftree-loop-distribution -mno-fix-cortex-a53-835769 \
+		  -fgcse-las -fbranch-target-load-optimize -fipa-pta -ftracer \
+		  -flive-range-shrinkage -fvariable-expansion-in-unroller
 endif
 
-KBUILD_CPPFLAGS := -D__KERNEL__
+KBUILD_CPPFLAGS := -D__KERNEL__ $(OPT_FLAGS)
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS_MODULE  := -DMODULE
@@ -552,14 +568,21 @@ endif
 ifneq ($(GCC_TOOLCHAIN),)
 CLANG_GCC_TC	:= --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
-KBUILD_CFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX)
-KBUILD_AFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX)
+KBUILD_CFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX) $(OPT_FLAGS)
+KBUILD_AFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX) $(OPT_FLAGS)
+KBUILD_CPPFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX) $(OPT_FLAGS)
 KBUILD_CPPFLAGS += $(call cc-option,-Qunused-arguments,)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-variable)
 KBUILD_CFLAGS += $(call cc-disable-warning, format-invalid-specifier)
 KBUILD_CFLAGS += $(call cc-disable-warning, gnu)
+KBUILD_CFLAGS += $(call cc-disable-warning, pointer-bool-conversion)
 KBUILD_CFLAGS += $(call cc-disable-warning, address-of-packed-member)
 KBUILD_CFLAGS += $(call cc-disable-warning, duplicate-decl-specifier)
+KBUILD_CFLAGS += $(call cc-disable-warning, return-stack-address)
+KBUILD_CFLAGS += -Wno-asm-operand-widths
+KBUILD_CFLAGS += -Wno-initializer-overrides
+KBUILD_CFLAGS += -fno-builtin
+
 # Quiet clang warning: comparison of unsigned expression < 0 is always false
 KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
 # CLANG uses a _MergedGlobals as optimization, but this breaks modpost, as the
@@ -686,25 +709,6 @@ endif
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
-ifeq ($(cc-name),clang)
-ifneq ($(CROSS_COMPILE),)
-CLANG_TRIPLE    ?= $(CROSS_COMPILE)
-CLANG_TARGET	:= --target=$(notdir $(CLANG_TRIPLE:%-=%))
-GCC_TOOLCHAIN_DIR := $(dir $(shell which $(LD)))
-CLANG_PREFIX	:= --prefix=$(GCC_TOOLCHAIN_DIR)
-GCC_TOOLCHAIN	:= $(realpath $(GCC_TOOLCHAIN_DIR)/..)
-endif
-ifneq ($(GCC_TOOLCHAIN),)
-CLANG_GCC_TC	:= --gcc-toolchain=$(GCC_TOOLCHAIN)
-endif
-KBUILD_CFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX)
-KBUILD_AFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX)
-KBUILD_CPPFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_PREFIX)
-KBUILD_CFLAGS += $(call cc-option, -no-integrated-as)
-KBUILD_AFLAGS += $(call cc-option, -no-integrated-as)
-KBUILD_CPPFLAGS += $(call cc-option, -no-integrated-as)
-endif
-
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
 KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
 CFLAGS_GCOV	:= -fprofile-arcs -ftest-coverage -fno-tree-loop-im $(call cc-disable-warning,maybe-uninitialized,)
@@ -826,9 +830,9 @@ ifdef CONFIG_PROFILE_ALL_BRANCHES
 KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
 else
 ifeq ($(cc-name),clang)
-KBUILD_CFLAGS   += -O3
+KBUILD_CFLAGS   += -O3 -g0
 else
-KBUILD_CFLAGS   += -O2
+KBUILD_CFLAGS   += -O2 -g0
 endif
 endif
 endif
@@ -1112,19 +1116,19 @@ core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
 drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
 libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
-libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
-libs-y		:= $(libs-y1) $(libs-y2)
+libs-y2		:= $(filter-out %.a, $(patsubst %/, %/built-in.o, $(libs-y)))
 virt-y		:= $(patsubst %/, %/built-in.o, $(virt-y))
 
 # Externally visible symbols (used by link-vmlinux.sh)
 export KBUILD_VMLINUX_INIT := $(head-y) $(init-y)
-export KBUILD_VMLINUX_MAIN := $(core-y) $(libs-y) $(drivers-y) $(net-y) $(virt-y)
+export KBUILD_VMLINUX_MAIN := $(core-y) $(libs-y2) $(drivers-y) $(net-y) $(virt-y)
+export KBUILD_VMLINUX_LIBS := $(libs-y1)
 export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux.lds
 export LDFLAGS_vmlinux
 # used by scripts/pacmage/Makefile
 export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(vmlinux-alldirs)) arch Documentation include samples scripts tools)
 
-vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
+vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN) $(KBUILD_VMLINUX_LIBS)
 
 # Include targets which we want to execute sequentially if the rest of the
 # kernel build went well. If CONFIG_TRIM_UNUSED_KSYMS is set, this might be
