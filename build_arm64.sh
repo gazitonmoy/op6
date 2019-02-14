@@ -8,6 +8,9 @@ restore='\033[0m'
 
 clear
 
+unset CROSS_COMPILE
+unset CROSS_COMPILE_ARM32
+
 # Resources
 THREAD="-j$(grep -c ^processor /proc/cpuinfo)"
 KERNEL="Image"
@@ -15,7 +18,7 @@ DTBIMAGE="dtb"
 #export CLANG_PATH=~/android/Toolchains/clang/clang-r328903/bin/
 #export PATH=${CLANG_PATH}:${PATH}
 #export CLANG_TRIPLE=aarch64-linux-gnu-
-export CROSS_COMPILE=${HOME}/android/Toolchains/gcc-arm-8.2-2019.01-x86_64-aarch64-elf/bin/aarch64-elf-
+export CROSS_COMPILE=${HOME}/android/Toolchains/gcc-arm-8.2-2019.01-x86_64-aarch64-linux-gnu/bin/aarch64-linux-gnu-
 export CROSS_COMPILE_ARM32=${HOME}/android/Toolchains/gcc-arm-8.2-2019.01-x86_64-arm-eabi/bin/arm-eabi-
 #export KBUILD_COMPILER_STRING=$(~/android/Toolchains/clang/clang-r328903/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
 DEFCONFIG="smurf_defconfig"

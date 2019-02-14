@@ -406,7 +406,7 @@ KBUILD_CFLAGS	+= -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -std=gnu89 $(call cc-option,-fno-PIE) \
 		   -mcpu=cortex-a75.cortex-a55+crypto -mtune=cortex-a75.cortex-a55 -fdiagnostics-color=always \
 		   -Wno-attribute-alias -fno-common -fshort-wchar  -floop-nest-optimize -fgraphite-identity \
-		   -ftree-loop-distribution -ffast-math -fgcse-sm -fwrapv \
+		   -ftree-loop-distribution -ffast-math -fgcse-sm \
 		   -fgcse-las -fbranch-target-load-optimize -fno-asynchronous-unwind-tables\
 		   -flive-range-shrinkage -fvariable-expansion-in-unroller -funsafe-math-optimizations
 
