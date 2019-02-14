@@ -637,7 +637,7 @@ static int __init cpu_input_boost_init(void)
 	}
 
 	ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
-	if (!ret)
+	if (ret)
 		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 
 	/* Init the cpumask */
