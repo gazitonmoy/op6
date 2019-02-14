@@ -12,8 +12,10 @@
 #include <linux/msm_drm_notify.h>
 
 static __read_mostly unsigned short flex_boost_duration = CONFIG_FLEX_DEVFREQ_BOOST_DURATION_MS;
+static __read_mostly unsigned short input_boost_duration = CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS;
 
 module_param(flex_boost_duration, short, 0644);
+module_param(input_boost_duration, short, 0644);
 
 struct boost_dev {
 	struct workqueue_struct *wq;
@@ -239,7 +241,7 @@ static void devfreq_input_boost(struct work_struct *work)
 	}
 
 	queue_delayed_work(b->wq, &b->input_unboost,
-		msecs_to_jiffies(CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS));
+		msecs_to_jiffies(input_boost_duration));
 }
 
 static void devfreq_input_unboost(struct work_struct *work)
@@ -258,6 +260,9 @@ static void devfreq_flex_boost(struct work_struct *work)
 {
 	struct boost_dev *b = container_of(work, typeof(*b), flex_boost);
 	unsigned long boost_jiffies;
+
+	if (flex_boost_duration=0) 
+		return;	
 
 	if (!cancel_delayed_work_sync(&b->flex_unboost)) {
 		struct devfreq *df = b->df;
