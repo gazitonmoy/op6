@@ -11,6 +11,7 @@
 #include <linux/input.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
+#include <linux/cpu_input_boost.h>
 
 unsigned long last_input_jiffies;
 unsigned int kgsl_cpu;
@@ -27,20 +28,20 @@ static __read_mostly unsigned int flex_boost_freq_lp = CONFIG_FLEX_BOOST_FREQ_LP
 static __read_mostly unsigned int flex_boost_freq_hp = CONFIG_FLEX_BOOST_FREQ_PERF;
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
-static bool stune_boost_active;
-static int boost_slot;
 static __read_mostly unsigned short dynamic_stune_boost=20;
 static __read_mostly unsigned short input_stune_boost_offset = CONFIG_INPUT_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short general_stune_boost_offset = CONFIG_GENERAL_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short stune_boost_extender_ms = CONFIG_STUNE_BOOST_EXTENDER_MS;
+
 module_param(dynamic_stune_boost, short, 0644);
 module_param(input_stune_boost_offset, short, 0644);
 module_param(max_stune_boost_offset, short, 0644);
 module_param(general_stune_boost_offset, short, 0644);
 module_param(flex_stune_boost_offset, short, 0644);
 module_param(stune_boost_extender_ms, short, 0644);
+module_param(kick_frame_boost_suspend_ms, uint, 0644);
 #endif
 
 module_param(input_boost_freq_lp, uint, 0644);
@@ -336,9 +337,9 @@ static void input_unboost_worker(struct work_struct *work)
 	clear_boost_bit(b, INPUT_BOOST);
 	update_online_cpu_policy();
 
-	if (!cancel_delayed_work_sync(&b->stune_extender_unboost)) 
-		queue_delayed_work(b->wq, &b->stune_extender_unboost,
-			msecs_to_jiffies(stune_boost_extender_ms));
+	cancel_delayed_work_sync(&b->stune_extender_unboost);
+	queue_delayed_work(b->wq, &b->stune_extender_unboost,
+		msecs_to_jiffies(stune_boost_extender_ms));
 }
 
 static void max_boost_worker(struct work_struct *work)
@@ -402,7 +403,10 @@ static void general_unboost_worker(struct work_struct *work)
 static void flex_boost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), flex_boost);
-
+	
+	if (flex_boost_duration=0) 
+		return;
+	
 	u32 state = get_boost_state(b);
 
 	if (!cancel_delayed_work_sync(&b->flex_unboost)) {
@@ -412,8 +416,10 @@ static void flex_boost_worker(struct work_struct *work)
 	queue_delayed_work(b->wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
 
-	update_stune_boost(b, state, FLEX_STUNE_BOOST, dynamic_stune_boost+flex_stune_boost_offset,
-		&b->flex_stune_slot);
+	if (!(state & MAX_STUNE_BOOST) && !(state & INPUT_STUNE_BOOST) && kick_stune_frame_boost()) {
+		update_stune_boost(b, state, FLEX_STUNE_BOOST, dynamic_stune_boost+flex_stune_boost_offset,
+			&b->flex_stune_slot);
+	}
 }
 
 static void flex_unboost_worker(struct work_struct *work)
@@ -435,6 +441,7 @@ static void stune_extender_unboost_worker(struct work_struct *work)
 	u32 state = get_boost_state(b);
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
+	pr_info("input_stune_stopped");
 #endif
 	
 }
@@ -460,20 +467,20 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 		}
 	}
 
-	if (state & FLEX_BOOST) {
+	/*if (state & FLEX_BOOST) {
 		if (kgsl_cpu == policy->cpu) {
 			boost_freq = get_boost_freq(b, policy->cpu, state);
 			policy->min = min(policy->max, boost_freq);
 			return NOTIFY_OK;
 		}
-	}
+	}*/
 
 	/*
 	 * Boost to policy->max if the boost frequency is higher. When
 	 * unboosting, set policy->min to the absolute min freq for the CPU.
 	 */
 	//if (state & INPUT_BOOST || state & GENERAL_BOOST || state & FLEX_BOOST) {
-	if (state & INPUT_BOOST || state & GENERAL_BOOST) {
+	if (state & INPUT_BOOST || state & GENERAL_BOOST || state & FLEX_BOOST) {
 		boost_freq = get_boost_freq(b, policy->cpu, state);
 		policy->min = min(policy->max, boost_freq);
 	} else {
@@ -653,7 +660,7 @@ static int __init cpu_input_boost_init(void)
 	/* Allow global boost config access for external boosts */
 	boost_drv_g = b;
 	set_boost_bit(b, SCREEN_AWAKE);
-
+	
 	return 0;
 
 unregister_handler:
