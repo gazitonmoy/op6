@@ -12,6 +12,7 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/cpu_input_boost.h>
+#include <linux/kthread.h>
 
 unsigned long last_input_jiffies;
 unsigned int kgsl_cpu;
@@ -69,13 +70,15 @@ module_param(remove_input_boost_freq_perf, uint, 0644);
 
 struct boost_drv {
 	struct workqueue_struct *wq;
-	struct work_struct input_boost;
+	struct kthread_worker worker;
+	struct task_struct *worker_thread;
+	struct kthread_work input_boost;
 	struct delayed_work input_unboost;
-	struct work_struct max_boost;
+	struct kthread_work max_boost;
 	struct delayed_work max_unboost;
-	struct work_struct general_boost;
+	struct kthread_work general_boost;
 	struct delayed_work general_unboost;
-	struct work_struct flex_boost;
+	struct kthread_work flex_boost;
 	struct delayed_work flex_unboost;
 	struct delayed_work stune_extender_unboost;
 	struct notifier_block cpu_notif;
@@ -201,7 +204,7 @@ void cpu_input_boost_kick(void)
 	if (!b)
 		return;
 
-	queue_work(b->wq, &b->input_boost);
+	kthread_queue_work(&b->worker, &b->input_boost);
 }
 
 static void __cpu_input_boost_kick_max(struct boost_drv *b,
@@ -221,7 +224,7 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->max_boost_dur, duration_ms);
-	queue_work(b->wq, &b->max_boost);
+	kthread_queue_work(&b->worker, &b->max_boost);
 }
 
 void cpu_input_boost_kick_max(unsigned int duration_ms)
@@ -260,7 +263,7 @@ static void __cpu_input_boost_kick_general(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->general_boost_dur, duration_ms);
-	queue_work(b->wq, &b->general_boost);
+	kthread_queue_work(&b->worker, &b->general_boost);
 }
 
 void cpu_input_boost_kick_general(unsigned int duration_ms)
@@ -294,7 +297,7 @@ static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 		new_expires) != curr_expires);
 
 	atomic_set(&b->flex_boost_dur, flex_boost_duration);
-	queue_work(b->wq, &b->flex_boost);
+	kthread_queue_work(&b->worker, &b->flex_boost);
 }
 
 void cpu_input_boost_kick_flex(void)
@@ -313,7 +316,7 @@ void cpu_input_boost_kick_flex(void)
 	__cpu_input_boost_kick_flex(b);
 }
 
-static void input_boost_worker(struct work_struct *work)
+static void input_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), input_boost);
 	u32 state = get_boost_state(b);
@@ -342,7 +345,7 @@ static void input_unboost_worker(struct work_struct *work)
 		msecs_to_jiffies(stune_boost_extender_ms));
 }
 
-static void max_boost_worker(struct work_struct *work)
+static void max_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), max_boost);
 	u32 state = get_boost_state(b);
@@ -371,7 +374,7 @@ static void max_unboost_worker(struct work_struct *work)
 	clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
 }
 
-static void general_boost_worker(struct work_struct *work)
+static void general_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), general_boost);
 	u32 state = get_boost_state(b);
@@ -400,7 +403,7 @@ static void general_unboost_worker(struct work_struct *work)
 	clear_stune_boost(b, state, GENERAL_STUNE_BOOST, b->general_stune_slot);
 }
 
-static void flex_boost_worker(struct work_struct *work)
+static void flex_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), flex_boost);
 	
@@ -529,7 +532,7 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 	if (!(state & SCREEN_AWAKE))
 		return;
 
-	queue_work(b->wq, &b->input_boost);
+	kthread_queue_work(&b->worker, &b->input_boost);
 
 	last_input_jiffies = jiffies;
 }
@@ -610,7 +613,9 @@ static struct input_handler cpu_input_boost_input_handler = {
 static int __init cpu_input_boost_init(void)
 {
 	struct boost_drv *b;
-	int ret;
+	int ret, i;
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO - 2 };
+	cpumask_t sys_bg_mask;
 
 	b = kzalloc(sizeof(*b), GFP_KERNEL);
 	if (!b)
@@ -622,14 +627,37 @@ static int __init cpu_input_boost_init(void)
 		goto free_b;
 	}
 
+	kthread_init_worker(&b->worker);
+	b->worker_thread = kthread_run(kthread_worker_fn, &b->worker,
+				       "cpu_input_boost_thread");
+	if (IS_ERR(b->worker_thread)) {
+		ret = PTR_ERR(b->worker_thread);
+		pr_err("Failed to start kworker, err: %d\n", ret);
+		goto free_b;
+	}
+
+	ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
+	if (!ret)
+		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
+
+	/* Init the cpumask */
+	for (i = 0; i <= 2; i++)
+		cpumask_set_cpu(i, &sys_bg_mask);
+
+	/* Bind it to the cpumask */
+	kthread_bind_mask(b->worker_thread, &sys_bg_mask);
+
+	/* Wake it up */
+	wake_up_process(b->worker_thread);
+
 	atomic64_set(&b->max_boost_expires, 0);
-	INIT_WORK(&b->input_boost, input_boost_worker);
+	kthread_init_work(&b->input_boost, input_boost_worker);
 	INIT_DELAYED_WORK(&b->input_unboost, input_unboost_worker);
-	INIT_WORK(&b->max_boost, max_boost_worker);
+	kthread_init_work(&b->max_boost, max_boost_worker);
 	INIT_DELAYED_WORK(&b->max_unboost, max_unboost_worker);
-	INIT_WORK(&b->general_boost, general_boost_worker);
+	kthread_init_work(&b->general_boost, general_boost_worker);
 	INIT_DELAYED_WORK(&b->general_unboost, general_unboost_worker);
-	INIT_WORK(&b->flex_boost, flex_boost_worker);
+	kthread_init_work(&b->flex_boost, flex_boost_worker);
 	INIT_DELAYED_WORK(&b->flex_unboost, flex_unboost_worker);
 	INIT_DELAYED_WORK(&b->stune_extender_unboost, stune_extender_unboost_worker);
 	atomic_set(&b->state, 0);
@@ -653,7 +681,7 @@ static int __init cpu_input_boost_init(void)
 	b->msm_drm_notif.priority = INT_MAX;
 	ret = msm_drm_register_client(&b->msm_drm_notif);
 	if (ret) {
-		pr_err("Failed to register dsi_panel_notifier, err: %d\n", ret);
+		pr_err("Failed to register msm_drm_notifier, err: %d\n", ret);
 		goto unregister_handler;
 	}
 
@@ -668,7 +696,7 @@ unregister_handler:
 unregister_cpu_notif:
 	cpufreq_unregister_notifier(&b->cpu_notif, CPUFREQ_POLICY_NOTIFIER);
 destroy_wq:
-	destroy_workqueue(b->wq);
+	kthread_destroy_worker(&b->worker);
 free_b:
 	kfree(b);
 	return ret;
