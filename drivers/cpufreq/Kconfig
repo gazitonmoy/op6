@@ -545,7 +545,7 @@ config FLEX_BOOST_DURATION_MS
 	  Input boost duration in milliseconds.
 
 config GENERAL_BOOST_STUNE_OFFSET
-	int "Foreground app schedtune general boost offset
+	int "Foreground app schedtune general boost offset"
 	depends on DYNAMIC_STUNE_BOOST
 	default "10"
 	help
@@ -593,6 +593,27 @@ config KICK_FRAME_BOOST_SUSPEND_MS
 	default '1300'
 	help
 	  Suspends frame commit boost for a given timespan
+
+config  GPU_BOOST_FREQ
+	int "Boost GPU to given frequency"
+	depends on DYNAMIC_STUNE_BOOST
+	default '342'
+	help
+	  Boosts GPU to given frequency
+
+config  GPU_MIN_FREQ
+	int "MIN GPU frequency"
+	depends on DYNAMIC_STUNE_BOOST
+	default '257'
+	help
+	  MIN GPU frequency
+
+config GPU_BOOST_EXTENDER_MS
+	int "Boost GPU for 3000 ms"
+	depends on DYNAMIC_STUNE_BOOST
+	default '3000'
+	help
+	  Boosts GPU to given frequency for 3000 ms
 
 endif
 
