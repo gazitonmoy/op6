@@ -261,7 +261,7 @@ static void devfreq_flex_boost(struct work_struct *work)
 	struct boost_dev *b = container_of(work, typeof(*b), flex_boost);
 	unsigned long boost_jiffies;
 
-	if (flex_boost_duration=0) 
+	if (flex_boost_duration==0) 
 		return;	
 
 	if (!cancel_delayed_work_sync(&b->flex_unboost)) {

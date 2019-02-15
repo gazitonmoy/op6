@@ -407,7 +407,7 @@ static void flex_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), flex_boost);
 	
-	if (flex_boost_duration=0) 
+	if (flex_boost_duration==0) 
 		return;
 	
 	u32 state = get_boost_state(b);
