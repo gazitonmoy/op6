@@ -469,7 +469,7 @@ static void flex_boost_worker(struct work_struct *work)
 	queue_delayed_work(b->wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
 
-	if (!(state & MAX_STUNE_BOOST) && !(state & INPUT_STUNE_BOOST) && kick_stune_frame_boost()) {
+	if (!(state & MAX_STUNE_BOOST) && !(state & INPUT_STUNE_BOOST) ) {
 		update_stune_boost(b, state, FLEX_STUNE_BOOST, dynamic_stune_boost+flex_stune_boost_offset,
 			&b->flex_stune_slot);	
 	}
