@@ -7511,6 +7511,21 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu,
 				  false;
 	fbt_env.avoid_prev_cpu = false;
 
+	if (prefer_idle || fbt_env.need_idle)
+		sync = 0;
+
+	if (sysctl_sched_sync_hint_enable && sync) {
+		int cpu = smp_processor_id();
+
+		if (bias_to_waker_cpu(p, cpu, rtg_target)) {
+			schedstat_inc(p->se.statistics.nr_wakeups_secb_sync);
+			schedstat_inc(this_rq()->eas_stats.secb_sync);
+			target_cpu = cpu;
+			fastpath = SYNC_WAKEUP;
+			goto unlock;
+		}
+	}
+
 	if (bias_to_prev_cpu(p, rtg_target)) {
 		target_cpu = prev_cpu;
 		fastpath = PREV_CPU_BIAS;
