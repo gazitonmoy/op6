@@ -222,7 +222,6 @@ static void clear_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=8;
 		mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
-		b->gpu_device->pwrctrl.active_pwrlevel=level;
 		mutex_unlock(&b->gpu_device->mutex);
 		clear_boost_bit(b, bit);
 	}
@@ -242,6 +241,7 @@ static void unboost_all_cpus(struct boost_drv *b)
 	clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
 	clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
 	clear_stune_boost(b, state, GENERAL_STUNE_BOOST, b->general_stune_slot);
+	clear_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_min_freq);
 }
 
 void cpu_input_boost_kick(void)
