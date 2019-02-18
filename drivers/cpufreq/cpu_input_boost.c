@@ -34,11 +34,11 @@ static __read_mostly unsigned int gpu_min_freq = CONFIG_GPU_MIN_FREQ;
 static __read_mostly unsigned int gpu_boost_extender_ms = CONFIG_GPU_BOOST_EXTENDER_MS;
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
-static __read_mostly unsigned short dynamic_stune_boost=20;
-static __read_mostly unsigned short input_stune_boost_offset = CONFIG_INPUT_BOOST_STUNE_OFFSET;
-static __read_mostly unsigned short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSET;
-static __read_mostly unsigned short general_stune_boost_offset = CONFIG_GENERAL_BOOST_STUNE_OFFSET;
-static __read_mostly unsigned short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
+static __read_mostly short dynamic_stune_boost=20;
+static __read_mostly short input_stune_boost_offset = CONFIG_INPUT_BOOST_STUNE_OFFSET;
+static __read_mostly short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSET;
+static __read_mostly short general_stune_boost_offset = CONFIG_GENERAL_BOOST_STUNE_OFFSET;
+static __read_mostly short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short stune_boost_extender_ms = CONFIG_STUNE_BOOST_EXTENDER_MS;
 
 module_param(dynamic_stune_boost, short, 0644);
