@@ -1912,8 +1912,8 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 		cpu_input_boost_kick_flex();
 		devfreq_boost_kick_flex(DEVFREQ_MSM_CPUBW);
 #ifdef CONFIG_KLAPSE
-		if (enable_klapse)
-			klapse_pulse();
+	if (klapse_enabled())
+		klapse_pulse();
 #endif
 	}
 

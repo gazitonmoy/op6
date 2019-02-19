@@ -18,7 +18,7 @@
 // For MTK these functions are created in mtk_disp_mgr in misc/mediatek/video/mt6752 folder 
 extern void force_livedisplay_set_rgb(int force_r, int force_g, int force_b);
 extern void klapse_pulse(void);
-static unsigned int enable_klapse;
+extern unsigned int klapse_enabled(void);
 //extern void update_disp_mgr(bool force_l);
 
 #endif	/* _LINUX_KLAPSE_H */

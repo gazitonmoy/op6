@@ -32,6 +32,10 @@ static struct timeval time;
 
 
 //Livedisplay related functions
+unsigned int klapse_enabled(void) {
+	return force_livedisplay;
+}
+
 void calc_active_minutes(void)
 {
     if(livedisplay_start_hour > livedisplay_stop_hour)
@@ -89,13 +93,12 @@ void force_livedisplay_set_rgb_brightness(int r,int g,int b)
 
 void klapse_pulse(void)
 {
-    if (!time_after(jiffies, last_klapse_pulse_jiffies + msecs_to_jiffies(60000)))
+    pr_info("Klapse_pulse");
+    if (!time_after(jiffies, last_klapse_pulse_jiffies + msecs_to_jiffies(10000)))
 	return;
 
-   last_klapse_pulse_jiffies=jiffies;
+    last_klapse_pulse_jiffies=jiffies;
 
-    pr_info("Klapse_pulse");
-    
     if (force_livedisplay == 1)
     {
         // Get time
@@ -660,6 +663,14 @@ int rc;
 	rc = sysfs_create_file(klapse_livedisplay_kobj, &dev_attr_klapse_scaling_rate.attr);
 	if (rc) {
 		pr_warn("%s: sysfs_create_file failed for klapse_scaling_rate\n", __func__);
+	}
+	rc = sysfs_create_file(klapse_livedisplay_kobj, &dev_attr_brightness_factor.attr);
+	if (rc) {
+		pr_warn("%s: sysfs_create_file failed for brightness_factor\n", __func__);
+	}
+	rc = sysfs_create_file(klapse_livedisplay_kobj, &dev_attr_brightness_factor_auto.attr);
+	if (rc) {
+		pr_warn("%s: sysfs_create_file failed for brightness_factor_auto\n", __func__);
 	}
   	rc = sysfs_create_file(klapse_livedisplay_kobj, &dev_attr_brightness_factor_auto_start_hour.attr);
 	if (rc) {
