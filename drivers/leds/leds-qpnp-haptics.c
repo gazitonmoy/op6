@@ -1603,8 +1603,9 @@ static ssize_t qpnp_haptics_store_duration(struct device *dev,
 
 	if (val > chip->max_play_time_ms)
 		return -EINVAL;
-
+#ifdef CONFIG_UNIFIED
 	if (is_oos()) {
+#endif
 		if (chip->vmax_override) {
 			old_vmax_mv = chip->vmax_mv;
 			if (val >= HAP_MIN_TIME_CALL)
@@ -1620,7 +1621,9 @@ static ssize_t qpnp_haptics_store_duration(struct device *dev,
 				return rc;
 			}
 		}
+#ifdef CONFIG_UNIFIED
 	}
+#endif
 
 	mutex_lock(&chip->param_lock);
 	rc = qpnp_haptics_auto_mode_config(chip, val);
@@ -1927,8 +1930,9 @@ static ssize_t qpnp_haptics_show_vmax_mv_user(struct device *dev,
 {
 	struct led_classdev *cdev = dev_get_drvdata(dev);
 	struct hap_chip *chip = container_of(cdev, struct hap_chip, cdev);
-	
+#ifdef CONFIG_UNIFIED	
 	if (is_oos())
+#endif
 		return snprintf(buf, PAGE_SIZE, "%d\n", chip->vmax_mv_user);
 	
 	return snprintf(buf, PAGE_SIZE, "%d\n", chip->vmax_mv);
@@ -1944,8 +1948,9 @@ static ssize_t qpnp_haptics_store_vmax_mv_user(struct device *dev,
 	rc = kstrtoint(buf, 10, &data);
 	if (rc < 0)
 		return rc;
-
+#ifdef CONFIG_UNIFIED
 	if (is_oos()) {
+#endif
 		old_vmax_mv = chip->vmax_mv_user;
 		chip->vmax_mv_user = data;
 		rc = qpnp_haptics_vmax_config(chip, chip->vmax_mv_user, false);
@@ -1953,6 +1958,7 @@ static ssize_t qpnp_haptics_store_vmax_mv_user(struct device *dev,
 			chip->vmax_mv_user = old_vmax_mv;
 			return rc;
 			}
+#ifdef CONFIG_UNIFIED
 	} else {
 		old_vmax_mv = chip->vmax_mv;
 		chip->vmax_mv = data;
@@ -1962,7 +1968,7 @@ static ssize_t qpnp_haptics_store_vmax_mv_user(struct device *dev,
 			return rc;			
 		}		
 	}
-
+#endif
 	return count;
 }
 

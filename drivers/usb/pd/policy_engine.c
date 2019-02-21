@@ -844,10 +844,14 @@ static void kick_sm(struct usbpd *pd, int ms)
 static void phy_sig_received(struct usbpd *pd, enum pd_sig_type sig)
 {
 	union power_supply_propval val = {1};
+#ifdef CONFIG_UNIFIED
 	if (is_oos()) {
+#endif
 		usbpd_info(&pd->dev, "%s return by oem\n", __func__);
 		return;
+#ifdef CONFIG_UNIFIED
 	}
+#endif
 
 	if (sig != HARD_RESET_SIG) {
 		usbpd_err(&pd->dev, "invalid signal (%d) received\n", sig);
@@ -1159,9 +1163,10 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 			start_usb_host(pd, true);
 			pd->ss_lane_svid = 0x0;
 		}
-
+#ifdef CONFIG_UNIFIED
 		if (!is_oos())
 			dual_role_instance_changed(pd->dual_role);
+#endif
 		
 		/* Set CC back to DRP toggle for the next disconnect */
 		val.intval = POWER_SUPPLY_TYPEC_PR_DUAL;
@@ -1232,8 +1237,9 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 			}
 
 			usbpd_err(&pd->dev, "Invalid request: %08x\n", pd->rdo);
-
+#ifdef CONFIG_UNIFIED
 			if (is_oos()) {
+#endif
 				if (pd->oem_bypass) {
 					usbpd_info(&pd->dev, "oem bypass invalid request!\n");
 				} else {
@@ -1248,6 +1254,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 					usbpd_set_state(pd, PE_SRC_SEND_CAPABILITIES);
 					break;
 				}
+#ifdef CONFIG_UNIFIED
 			} else {
 				if (pd->in_explicit_contract)
 					usbpd_set_state(pd, PE_SRC_READY);
@@ -1260,6 +1267,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 					usbpd_set_state(pd, PE_SRC_SEND_CAPABILITIES);
 				break;
 			}
+#endif
 		}
 
 		/* PE_SRC_TRANSITION_SUPPLY pseudo-state */
@@ -1342,9 +1350,10 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 				usb_compliance_mode)
 				start_usb_peripheral(pd);
 		}
-
+#ifdef CONFIG_UNIFIED
 		if (!is_oos())
 			dual_role_instance_changed(pd->dual_role);
+#endif
 
 		ret = power_supply_get_property(pd->usb_psy,
 				POWER_SUPPLY_PROP_PD_ALLOWED, &val);
@@ -2204,13 +2213,16 @@ static void usbpd_sm(struct work_struct *w)
 				ARRAY_SIZE(default_src_caps), SOP_MSG);
 		if (ret) {
 			pd->caps_count++;
+#ifdef CONFIG_UNIFIED
 			if (is_oos()) {
+#endif
 				if (pd->caps_count < 10 && pd->current_dr == DR_DFP) {
 					start_usb_host(pd, true);
 				} else if (pd->caps_count >= 10) {
 					usbpd_set_state(pd, PE_SRC_DISABLED);
 					break;
 				}
+#ifdef CONFIG_UNIFIED
 			} else {
 				if (pd->caps_count >= PD_CAPS_COUNT) {
 					usbpd_dbg(&pd->dev, "Src CapsCounter exceeded, disabling PD\n");
@@ -2221,6 +2233,7 @@ static void usbpd_sm(struct work_struct *w)
 					&val);
 				}
 			}
+#endif
 			kick_sm(pd, SRC_CAP_TIME);
 			break;
 		}
@@ -4242,8 +4255,9 @@ struct usbpd *usbpd_create(struct device *parent)
 	} else {
 		pd->dual_role->drv_data = pd;
 	}
-
+#ifdef CONFIG_UNIFIED
 	if (is_oos())
+#endif
 		pd->oem_bypass = true;
 	pd->current_pr = PR_NONE;
 	pd->current_dr = DR_NONE;

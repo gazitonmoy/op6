@@ -3959,7 +3959,9 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	panel->panel_initialized = true;
 	pr_err("aod_mode =%d\n",panel->aod_mode);
 	mutex_unlock(&panel->panel_lock);
+#ifdef CONFIG_UNIFIED
 	if (is_oos()) {
+#endif
 		if(panel->aod_mode==2){
 			rc = dsi_panel_set_aod_mode(panel, 2);
 			}
@@ -3985,6 +3987,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 		  	printk(KERN_ERR"Z4\n");
 			dsi_panel_set_adaption_mode(panel, panel->adaption_mode);
 			}
+#ifdef CONFIG_UNIFIED
 	} else {
 		        if (panel->acl_mode)
            			dsi_panel_set_acl_mode(panel, panel->acl_mode);
@@ -4007,6 +4010,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
         		if (panel->hbm_mode)
             			dsi_panel_set_hbm_mode(panel, panel->hbm_mode);
 	}
+#endif
 	pr_err("end\n");
 	pm_print_active_wakeup_sources_queue(false);
 	return rc;
