@@ -62,6 +62,7 @@
 #include <linux/sysfs.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/set_os.h>
 #include <drm/drm_mipi_dsi.h>
 #include "exposure_adjustment.h"
 
@@ -4958,6 +4959,21 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 		display->panel->dim_status = true;
 	else
 		display->panel->dim_status = false;
+
+	if (!is_oos()) {
+		if (fp_mode == 1 && sde_crtc_config_fingerprint_dim_layer(&cstate->base, 5)) {
+			pr_err("Failed to config dim layer\n");
+			return -EINVAL;
+		}
+		if (fp_mode == 1) {
+			cstate->fingerprint_pressed = true;
+			return 0;
+		} else {
+			cstate->fingerprint_pressed = false;
+			cstate->fingerprint_dim_layer = NULL;
+			return 0;
+		}
+	}
 
 	if(aod_index <0)
 		oneplus_aod_hid = 0;
