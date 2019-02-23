@@ -26,10 +26,8 @@
 #include <linux/dyn_sync_cntrl.h>
 #endif
 
-#ifndef CONFIG_DYNAMIC_FSYNC
 bool fsync_enabled = true;
 module_param(fsync_enabled, bool, 0644);
-#endif
 
 #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
 			SYNC_FILE_RANGE_WAIT_AFTER)
@@ -200,10 +198,8 @@ SYSCALL_DEFINE1(syncfs, int, fd)
 		return 0;
 	#endif
 	
-	#ifndef CONFIG_DYNAMIC_FSYNC
 	if (!fsync_enabled)
 		return 0;
-	#endif
 
 	f = fdget(fd);
 	if (!f.file)
@@ -237,10 +233,10 @@ int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 	if (likely(dyn_fsync_active && suspend_active))
 		return 0;
 #endif	
-#ifndef CONFIG_DYNAMIC_FSYNC
+
 	if (!fsync_enabled)
 		return 0;
-#endif
+
 	
 
 	if (!file->f_op->fsync)
@@ -333,10 +329,10 @@ static int do_fsync(unsigned int fd, int datasync)
 	if (likely(dyn_fsync_active && suspend_active))
 		return 0;
 #endif
-#ifndef CONFIG_DYNAMIC_FSYNC
+
 	if (!fsync_enabled)
 		return 0;
-#endif
+
 #ifdef CONFIG_ASYNC_FSYNC
         struct fsync_work *fwork;
 #endif
@@ -477,14 +473,14 @@ SYSCALL_DEFINE4(sync_file_range, int, fd, loff_t, offset, loff_t, nbytes,
 	struct address_space *mapping;
 	loff_t endbyte;			/* inclusive */
 	umode_t i_mode;
-#ifndef CONFIG_DYNAMIC_FSYNC
-	if (!fsync_enabled)
-		return 0;
-#endif
+
 #ifdef CONFIG_DYNAMIC_FSYNC
 	if (likely(dyn_fsync_active && suspend_active))
 		return 0;
 #endif
+	
+	if (!fsync_enabled)
+		return 0;
 
 	ret = -EINVAL;
 	if (flags & ~VALID_FLAGS)
