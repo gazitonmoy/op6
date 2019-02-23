@@ -279,11 +279,6 @@ compatible = "qcom,msm8917-mtp"
 compatible = "qcom,msm8917-rumi"
 compatible = "qcom,msm8917-qrd"
 compatible = "qcom,msm8917-qrd-sku5"
-<<<<<<< HEAD
-=======
-compatible = "qcom,msm8940-mtp"
-compatible = "qcom,msm8940-cdp"
->>>>>>> 78079d0bf8582... Merge tag 'LA.UM.7.8.r3-01100-SDM710.0'
 compatible = "qcom,msm8926-cdp"
 compatible = "qcom,msm8926-mtp"
 compatible = "qcom,msm8926-qrd"
