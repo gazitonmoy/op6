@@ -36,10 +36,13 @@ void sde_setup_dspp_igcv3(struct sde_hw_dspp *ctx, void *cfg);
  * @cfg: pointer to sde_hw_cp_cfg
  */
 void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg);
+<<<<<<< HEAD
 #ifdef CONFIG_KLAPSE
 extern unsigned short kcal_red;
 extern unsigned short kcal_green;
 extern unsigned short kcal_blue;
 #endif
+=======
+>>>>>>> 1e02396a5d883... KLAPSE v3.0 - Major changes in algorithm and tunables
 
 #endif /* _SDE_HW_COLOR_PROC_V4_H_ */
