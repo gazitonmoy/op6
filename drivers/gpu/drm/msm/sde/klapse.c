@@ -73,13 +73,13 @@ static struct timer_list pulse_timer;
 
 
 //klapse related functions
-void restart_timer()
+void restart_timer(void)
 {
   mod_timer(&pulse_timer, jiffies + msecs_to_jiffies(pulse_freq));
   printk(KERN_INFO "KLapse pulse timer restarted!!!.\n");
 }
 
-void flush_timer()
+void flush_timer(void)
 {
   if (timer_pending(&pulse_timer))
     mod_timer_pending(&pulse_timer, jiffies);
@@ -662,7 +662,7 @@ static ssize_t pulse_freq_dump(struct device *dev,
 {
     unsigned long tmp = 0;
 
-    if (!sscanf(buf, "%u", &tmp))
+    if (!sscanf(buf, "%lu", &tmp))
       return -EINVAL;     
 
     if ((tmp >= 1000) && (tmp <= 10*60000))
