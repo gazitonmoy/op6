@@ -229,6 +229,7 @@ static void unboost_all_cpus(struct boost_drv *b)
 	u32 state = get_boost_state(b);
 
 	if (!cancel_delayed_work_sync(&b->input_unboost) &&
+		!cancel_delayed_work_sync(&b->flex_unboost) &&
 		!cancel_delayed_work_sync(&b->max_unboost))
 		return;
 
@@ -368,14 +369,16 @@ static void input_boost_worker(struct work_struct *work)
 	if (!cancel_delayed_work_sync(&b->input_unboost)) {
 		set_boost_bit(b, INPUT_BOOST);
 		update_online_cpu_policy();
+
+		update_stune_boost(b, state, INPUT_STUNE_BOOST, dynamic_stune_boost+input_stune_boost_offset,
+			&b->input_stune_slot);		
+
+		update_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_boost_freq);	
 	}
+
 	queue_delayed_work(b->wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
-
-	update_stune_boost(b, state, INPUT_STUNE_BOOST, dynamic_stune_boost+input_stune_boost_offset,
-		&b->input_stune_slot);		
-
-	update_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_boost_freq);		
+	
 }
 
 static void input_unboost_worker(struct work_struct *work)
@@ -403,13 +406,13 @@ static void max_boost_worker(struct work_struct *work)
 	if (!cancel_delayed_work_sync(&b->max_unboost)) {
 		set_boost_bit(b, MAX_BOOST);
 		update_online_cpu_policy();
+	
+		update_stune_boost(b, state, MAX_STUNE_BOOST, dynamic_stune_boost+max_stune_boost_offset,
+			&b->max_stune_slot);
 	}
 
 	queue_delayed_work(b->wq, &b->max_unboost,
 		msecs_to_jiffies(atomic_read(&b->max_boost_dur)));
-
-	update_stune_boost(b, state, MAX_STUNE_BOOST, dynamic_stune_boost+max_stune_boost_offset,
-		&b->max_stune_slot);
 }
 
 static void max_unboost_worker(struct work_struct *work)
@@ -432,13 +435,13 @@ static void general_boost_worker(struct work_struct *work)
 	if (!cancel_delayed_work_sync(&b->general_unboost)) {
 		set_boost_bit(b, GENERAL_BOOST);
 		update_online_cpu_policy();
+
+		update_stune_boost(b, state, GENERAL_STUNE_BOOST, dynamic_stune_boost+general_stune_boost_offset,
+			&b->general_stune_slot);
 	}
 
 	queue_delayed_work(b->wq, &b->general_unboost,
 		msecs_to_jiffies(atomic_read(&b->general_boost_dur)));
-
-	update_stune_boost(b, state, GENERAL_STUNE_BOOST, dynamic_stune_boost+general_stune_boost_offset,
-		&b->general_stune_slot);
 }
 
 static void general_unboost_worker(struct work_struct *work)
@@ -465,14 +468,15 @@ static void flex_boost_worker(struct work_struct *work)
 	if (!cancel_delayed_work_sync(&b->flex_unboost)) {
 		set_boost_bit(b, FLEX_BOOST);
 		update_online_cpu_policy();
+
+		if (!(state & MAX_STUNE_BOOST) && !(state & INPUT_STUNE_BOOST) ) {
+			update_stune_boost(b, state, FLEX_STUNE_BOOST, dynamic_stune_boost+flex_stune_boost_offset,
+				&b->flex_stune_slot);	
+		}
 	}
+
 	queue_delayed_work(b->wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
-
-	if (!(state & MAX_STUNE_BOOST) && !(state & INPUT_STUNE_BOOST) ) {
-		update_stune_boost(b, state, FLEX_STUNE_BOOST, dynamic_stune_boost+flex_stune_boost_offset,
-			&b->flex_stune_slot);	
-	}
 }
 
 static void flex_unboost_worker(struct work_struct *work)
