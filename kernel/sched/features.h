@@ -114,4 +114,10 @@ SCHED_FEAT(EAS_USE_NEED_IDLE, true)
  * If disabled, this behaviour will only apply to tasks of the
  * RT class.
  */
-SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, true)
+SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
+
+/*
+ * Bias schedtune boosted tasks to higher capacity CPUs.
+ * If disabled, no bias will be applied.
+ */
+SCHED_FEAT(STUNE_BOOST_BIAS_BIG, true)
