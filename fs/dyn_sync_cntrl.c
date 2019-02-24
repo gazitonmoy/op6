@@ -121,6 +121,9 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	struct msm_drm_notifier *evdata = data;
 	int blank;
 
+	if (!dyn_fsync_active) 
+		return 0;
+
 	blank = *(int *)(evdata->data);	
 
 	if (((blank == MSM_DRM_BLANK_POWERDOWN)
