@@ -41,6 +41,7 @@ static __read_mostly short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSE
 static __read_mostly short general_stune_boost_offset = CONFIG_GENERAL_BOOST_STUNE_OFFSET;
 static __read_mostly short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
 static __read_mostly unsigned short stune_boost_extender_ms = CONFIG_STUNE_BOOST_EXTENDER_MS;
+static __read_mostly int suspend_stune_boost = CONFIG_SUSPEND_STUNE_BOOST;
 
 module_param(dynamic_stune_boost, short, 0644);
 module_param(input_stune_boost_offset, short, 0644);
@@ -64,6 +65,8 @@ module_param(input_boost_duration, short, 0644);
 module_param(flex_boost_duration, short, 0644);
 module_param(remove_input_boost_freq_lp, uint, 0644);
 module_param(remove_input_boost_freq_perf, uint, 0644);
+module_param(suspend_stune_boost, int, 0644);
+module_param(frame_boost_timeout, uint, 0644);
 
 /* Available bits for boost_drv state */
 #define SCREEN_AWAKE		BIT(0)
@@ -106,6 +109,7 @@ struct boost_drv {
 	int input_stune_slot;
 	int max_stune_slot;
 	int general_stune_slot;
+	int root_stune_default;
 	int flex_stune_slot;
 	int cpu;
 };
@@ -577,8 +581,10 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	if (blank == MSM_DRM_BLANK_UNBLANK_CUST) {
 		set_boost_bit(b, SCREEN_AWAKE);
 		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, 0);
-
+		set_stune_boost("/", b->root_stune_default, NULL);
 	} else {
+		set_stune_boost("/", suspend_stune_boost,
+				&b->root_stune_default);
 		clear_boost_bit(b, SCREEN_AWAKE);
 		unboost_all_cpus(b);
 	}
@@ -728,6 +734,7 @@ static int __init cpu_input_boost_init(void)
 	INIT_DELAYED_WORK(&b->stune_extender_unboost, stune_extender_unboost_worker);
 	INIT_DELAYED_WORK(&b->gpu_extender_unboost, gpu_extender_unboost_worker);
 	atomic_set(&b->state, 0);
+	b->root_stune_default = 0;
 
 	b->cpu_notif.notifier_call = cpu_notifier_cb;
 	b->cpu_notif.priority = INT_MAX - 2;

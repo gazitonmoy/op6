@@ -615,6 +615,15 @@ config GPU_BOOST_EXTENDER_MS
 	help
 	  Boosts GPU to given frequency for 3000 ms
 
+config SUSPEND_STUNE_BOOST
+	int "Suspend SchedTune boost value"
+	depends on DYNAMIC_STUNE_BOOST
+	default "-50"
+	help
+	  SchedTune boost value during suspend. This alters the perceived load
+	  of process groups in order to bias core selection as well as CPU
+	  frequency selection. A value of 0 disables this functionality.
+
 endif
 
 comment "CPU frequency scaling drivers"
