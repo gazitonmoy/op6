@@ -36,11 +36,8 @@
 
 #define DEFAULT_SUSPEND_MAX_FREQ_SILVER 300000
 #define DEFAULT_SUSPEND_MAX_FREQ_GOLD 825600
-#define DEFAULT_SUSPEND_CAPACITY_FACTOR 10
 
 #define SMUGOV_KTHREAD_PRIORITY	50
-
-static unsigned int hispeed_freq_restore;
 
 struct smugov_tunables {
 	struct gov_attr_set attr_set;
@@ -55,7 +52,6 @@ struct smugov_tunables {
 	unsigned int target_load2;
 	unsigned int silver_suspend_max_freq;
 	unsigned int gold_suspend_max_freq;
-	unsigned int suspend_capacity_factor;
 };
 
 struct smugov_policy {
@@ -187,7 +183,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	struct smugov_tunables *tunables = sg_policy->tunables;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
-	unsigned int capacity_factor, silver_max_freq, gold_max_freq;
+	unsigned int silver_max_freq, gold_max_freq;
 
 	unsigned long load = 100 * util / max;
 
@@ -828,7 +824,6 @@ static ssize_t silver_suspend_max_freq_store(struct gov_attr_set *attr_set,
 				      const char *buf, size_t count)
 {
 	struct smugov_tunables *tunables = to_smugov_tunables(attr_set);
-	struct smugov_policy *sg_policy;
 	unsigned int max_freq;
 
 	if (kstrtouint(buf, 10, &max_freq))
@@ -850,36 +845,12 @@ static ssize_t gold_suspend_max_freq_store(struct gov_attr_set *attr_set,
 				      const char *buf, size_t count)
 {
 	struct smugov_tunables *tunables = to_smugov_tunables(attr_set);
-	struct smugov_policy *sg_policy;
 	unsigned int max_freq;
 
 	if (kstrtouint(buf, 10, &max_freq))
 		return -EINVAL;
 
 	tunables->gold_suspend_max_freq = max_freq;
-
-	return count;
-}
-
-static ssize_t suspend_capacity_factor_show(struct gov_attr_set *attr_set, char *buf)
-{
-	struct smugov_tunables *tunables = to_smugov_tunables(attr_set);
-
-	return scnprintf(buf, PAGE_SIZE, "%u\n", tunables->suspend_capacity_factor);
-}
-
-static ssize_t suspend_capacity_factor_store(struct gov_attr_set *attr_set,
-				      const char *buf, size_t count)
-{
-	struct smugov_tunables *tunables = to_smugov_tunables(attr_set);
-	struct smugov_policy *sg_policy;
-	unsigned int factor;
-
-	if (kstrtouint(buf, 10, &factor))
-		return -EINVAL;
-
-
-	tunables->suspend_capacity_factor = factor;
 
 	return count;
 }
@@ -990,7 +961,6 @@ static struct governor_attr target_load1 = __ATTR_RW(target_load1);
 static struct governor_attr target_load2 = __ATTR_RW(target_load2);
 static struct governor_attr silver_suspend_max_freq = __ATTR_RW(silver_suspend_max_freq);
 static struct governor_attr gold_suspend_max_freq = __ATTR_RW(gold_suspend_max_freq);
-static struct governor_attr suspend_capacity_factor = __ATTR_RW(suspend_capacity_factor);
 
 static struct attribute *smugov_attributes[] = {
 	&rate_limit_us.attr,
@@ -1004,7 +974,6 @@ static struct attribute *smugov_attributes[] = {
 	&target_load2.attr,
 	&silver_suspend_max_freq.attr,
 	&gold_suspend_max_freq.attr,
-	&suspend_capacity_factor.attr,
 	NULL
 };
 
@@ -1127,7 +1096,6 @@ static void smugov_tunables_save(struct cpufreq_policy *policy,
 	cached->target_load2 = tunables->target_load2;
 	cached->silver_suspend_max_freq = tunables->silver_suspend_max_freq;
 	cached->gold_suspend_max_freq = tunables->gold_suspend_max_freq;	
-	cached->suspend_capacity_factor = tunables->suspend_capacity_factor;
 }
 
 static void smugov_tunables_free(struct smugov_tunables *tunables)
@@ -1158,7 +1126,6 @@ static void smugov_tunables_restore(struct cpufreq_policy *policy)
 	tunables->target_load2 = cached->target_load2;
 	tunables->silver_suspend_max_freq = cached->silver_suspend_max_freq;
 	tunables->gold_suspend_max_freq = cached->gold_suspend_max_freq;	
-	tunables->suspend_capacity_factor = cached->suspend_capacity_factor;
 	sg_policy->freq_update_delay_ns =
 		tunables->rate_limit_us * NSEC_PER_USEC;
 }
@@ -1213,7 +1180,6 @@ static int smugov_init(struct cpufreq_policy *policy)
 	tunables->hispeed_freq = 1132800;
 	tunables->silver_suspend_max_freq = DEFAULT_SUSPEND_MAX_FREQ_SILVER;
 	tunables->gold_suspend_max_freq = DEFAULT_SUSPEND_MAX_FREQ_GOLD;
-	tunables->suspend_capacity_factor = DEFAULT_SUSPEND_CAPACITY_FACTOR;
 
 	if (cpu < 4){
 		tunables->rate_limit_us = RATE_LIMIT;
