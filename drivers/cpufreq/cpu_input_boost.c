@@ -66,7 +66,6 @@ module_param(flex_boost_duration, short, 0644);
 module_param(remove_input_boost_freq_lp, uint, 0644);
 module_param(remove_input_boost_freq_perf, uint, 0644);
 module_param(suspend_stune_boost, int, 0644);
-module_param(frame_boost_timeout, uint, 0644);
 
 /* Available bits for boost_drv state */
 #define SCREEN_AWAKE		BIT(0)
@@ -466,12 +465,12 @@ static void general_unboost_worker(struct work_struct *work)
 static void flex_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), flex_boost);
+
+	u32 state = get_boost_state(b);
 	
 	if (flex_boost_duration==0) 
 		return;
 	
-	u32 state = get_boost_state(b);
-
 	if (!cancel_delayed_work_sync(&b->flex_unboost)) {
 		set_boost_bit(b, FLEX_BOOST);
 		update_online_cpu_policy();
