@@ -587,13 +587,6 @@ config STUNE_BOOST_EXTENDER_MS
 	help
 	  Extends the stune boost duration to a given timespan
 
-config KICK_FRAME_BOOST_SUSPEND_MS
-	int "Suspend frame commit boost for 1300 ms"
-	depends on DYNAMIC_STUNE_BOOST
-	default '1300'
-	help
-	  Suspends frame commit boost for a given timespan
-
 config  GPU_BOOST_FREQ
 	int "Boost GPU to given frequency"
 	depends on DYNAMIC_STUNE_BOOST

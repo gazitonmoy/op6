@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2018 Sultan Alsawaf <sultan@kerneltoast.com>.
  */
+// Copyright (C) 2019 GPU input boost, Erik Müller <pappschlumpf@xda>
 
 #define pr_fmt(fmt) "cpu_input_boost: " fmt
 
@@ -15,9 +16,6 @@
 #include "../gpu/msm/kgsl.h"
 #include "../gpu/msm/kgsl_pwrscale.h"
 #include "../gpu/msm/kgsl_device.h"
-
-unsigned long last_input_jiffies;
-unsigned int kgsl_cpu;
 
 static __read_mostly unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static __read_mostly unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
@@ -48,7 +46,6 @@ module_param(max_stune_boost_offset, short, 0644);
 module_param(general_stune_boost_offset, short, 0644);
 module_param(flex_stune_boost_offset, short, 0644);
 module_param(stune_boost_extender_ms, short, 0644);
-module_param(kick_frame_boost_suspend_ms, uint, 0644);
 module_param(gpu_boost_freq, uint, 0644);
 module_param(gpu_min_freq, uint, 0644);
 module_param(gpu_boost_extender_ms, uint, 0644);
@@ -203,9 +200,7 @@ static void update_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=6;
 		if (freq==257)
 			level=7;
-		mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
-		mutex_unlock(&b->gpu_device->mutex);	
 		set_boost_bit(b, bit);
 	}
 }
@@ -220,9 +215,7 @@ static void clear_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=7;
 		if (freq==180)
 			level=8;
-		mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
-		mutex_unlock(&b->gpu_device->mutex);
 		clear_boost_bit(b, bit);
 	}
 }
@@ -536,14 +529,6 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 		}
 	}
 
-	/*if (state & FLEX_BOOST) {
-		if (kgsl_cpu == policy->cpu) {
-			boost_freq = get_boost_freq(b, policy->cpu, state);
-			policy->min = min(policy->max, boost_freq);
-			return NOTIFY_OK;
-		}
-	}*/
-
 	/*
 	 * Boost to policy->max if the boost frequency is higher. When
 	 * unboosting, set policy->min to the absolute min freq for the CPU.
@@ -576,13 +561,14 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (blank == MSM_DRM_BLANK_UNBLANK_CUST) {
 		set_boost_bit(b, SCREEN_AWAKE);
-		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, 0);
 		set_stune_boost("/", b->root_stune_default, NULL);
+		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, 0);
+		
 	} else {
-		set_stune_boost("/", suspend_stune_boost,
-				&b->root_stune_default);
 		clear_boost_bit(b, SCREEN_AWAKE);
 		unboost_all_cpus(b);
+		set_stune_boost("/", suspend_stune_boost,
+			&b->root_stune_default);
 	}
 
 	return NOTIFY_OK;
@@ -601,8 +587,6 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 		return;
 
 	queue_work(b->wq, &b->input_boost);
-
-	last_input_jiffies = jiffies;
 }
 
 static int cpu_input_boost_input_connect(struct input_handler *handler,

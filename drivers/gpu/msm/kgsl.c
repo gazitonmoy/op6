@@ -4788,7 +4788,6 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 			if ((1 << cpu) & device->pwrctrl.l2pc_cpus_mask) {
 				cpumask_set_cpu(cpu, &device->pwrctrl.
 						l2pc_cpus_qos.cpus_affine);
-				kgsl_cpu=cpu;
 			}
 		}
 
