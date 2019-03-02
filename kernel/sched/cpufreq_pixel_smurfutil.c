@@ -212,7 +212,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	struct smugov_tunables *tunables = sg_policy->tunables;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
-	unsigned int capacity_factor, silver_max_freq, gold_max_freq;
+	unsigned int silver_max_freq, gold_max_freq;
 
 	unsigned long load = 100 * util / max;
 
