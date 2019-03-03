@@ -4,7 +4,7 @@
 #include <uapi/linux/rtc.h>
 #include <linux/rtc.h>
 #include <linux/timer.h>
-#include "klapse.h"
+#include <linux/klapse.h>
 
 //Add additional headers below here only
 #include "sde_hw_color_proc_v4.h"
