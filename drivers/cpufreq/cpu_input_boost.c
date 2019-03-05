@@ -595,7 +595,7 @@ static struct input_handler cpu_input_boost_input_handler = {
 static int __init cpu_input_boost_init(void)
 {
 	struct boost_drv *b;
-	int ret;
+	int ret, c;
 	struct sched_param param = { .sched_priority = input_thread_prio};
 	cpumask_t sys_bg_mask;
 
@@ -616,7 +616,8 @@ static int __init cpu_input_boost_init(void)
 	if (ret)
 		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 
-	cpumask_set_cpu(0, &sys_bg_mask);
+	for (c = 0; c < 4; c++) 
+		cpumask_set_cpu(c, &sys_bg_mask);
 
 	/* Bind it to the cpumask */
 	kthread_bind_mask(b->worker_thread, &sys_bg_mask);

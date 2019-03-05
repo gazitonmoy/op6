@@ -447,7 +447,7 @@ static struct input_handler devfreq_boost_input_handler = {
 static int __init devfreq_boost_init(void)
 {
 	struct df_boost_drv *d;
-	int i, ret;
+	int i, c, ret;
 	cpumask_t sys_bg_mask;
 	struct sched_param param = { .sched_priority = devfreq_thread_prio};
 
@@ -471,7 +471,8 @@ static int __init devfreq_boost_init(void)
 		if (ret)
 			pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 
-		cpumask_set_cpu(0, &sys_bg_mask);
+		for (c = 0; c < 4; c++) 
+			cpumask_set_cpu(c, &sys_bg_mask);
 
 		/* Bind it to the cpumask */
 		kthread_bind_mask(b->worker_thread, &sys_bg_mask);
