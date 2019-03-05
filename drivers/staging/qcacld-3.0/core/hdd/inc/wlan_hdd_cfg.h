@@ -2860,7 +2860,7 @@ enum hdd_dot11_mode {
  *
  * @min: 0x0
  * @max: 0xffffffff
- * @defalut: 0xc8a
+ * @defalut: 0xc83
  *
  * |31  12|  11  |  10  |9    8|7    6|5    4|3    2|  1  |  0  |
  * +------+------+------+------+------+------+------+-----+-----+
@@ -2893,7 +2893,7 @@ enum hdd_dot11_mode {
 #define CFG_LATENCY_FLAGS_ULTRALOW_NAME    "wlm_latency_flags_ultralow"
 #define CFG_LATENCY_FLAGS_ULTRALOW_MIN     (0x0)
 #define CFG_LATENCY_FLAGS_ULTRALOW_MAX     (0xffffffff)
-#define CFG_LATENCY_FLAGS_ULTRALOW_DEFAULT (0xc8a)
+#define CFG_LATENCY_FLAGS_ULTRALOW_DEFAULT (0xc83)
 
 #define CFG_INTF0_MAC_ADDR_NAME                  "Intf0MacAddress"
 #define CFG_INTF0_MAC_ADDR_MIN                   "000000000000"
@@ -11940,11 +11940,10 @@ enum hw_filter_mode {
  *
  * Supported Feature: PACKET FILTERING
  */
-#define CFG_ENABLE_PACKET_FILTERS_NAME      "g_enable_packet_filter_bitmap"
-#define CFG_ENABLE_PACKET_FILTERS_NAME_NOOP "g_enable_packet_filter_bitmap_noop"
-#define CFG_ENABLE_PACKET_FILTERS_DEFAULT   (0)
-#define CFG_ENABLE_PACKET_FILTERS_MIN       (0)
-#define CFG_ENABLE_PACKET_FILTERS_MAX       (63)
+#define CFG_ENABLE_PACKET_FILTERS_NAME     "g_enable_packet_filter_bitmap"
+#define CFG_ENABLE_PACKET_FILTERS_DEFAULT  (0)
+#define CFG_ENABLE_PACKET_FILTERS_MIN      (0)
+#define CFG_ENABLE_PACKET_FILTERS_MAX      (63)
 
 /*
  * <ini>
@@ -14318,7 +14317,7 @@ enum hw_filter_mode {
 #define CFG_ENABLE_FILS_DISCOVERY_SAP_NAME    "oce_enable_fils_discovery_sap"
 #define CFG_ENABLE_FILS_DISCOVERY_SAP_MIN     (0)
 #define CFG_ENABLE_FILS_DISCOVERY_SAP_MAX     (1)
-#define CFG_ENABLE_FILS_DISCOVERY_SAP_DEFAULT (0)
+#define CFG_ENABLE_FILS_DISCOVERY_SAP_DEFAULT (1)
 
 /*
  * <ini>
@@ -16001,7 +16000,6 @@ struct hdd_config {
 
 	uint8_t                     auto_pwr_save_fail_mode;
 	uint8_t packet_filters_bitmap;
-	uint8_t packet_filters_bitmap_noop;
 	uint32_t                    arp_ac_category;
 
 	bool probe_req_ie_whitelist;
