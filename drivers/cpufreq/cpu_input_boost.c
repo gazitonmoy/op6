@@ -238,6 +238,14 @@ static void unboost_all_cpus(struct boost_drv *b)
 	clear_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_min_freq);
 }
 
+static void __cpu_input_boost_kick(struct boost_drv *b)
+{
+	if (!(get_boost_state(b) & SCREEN_AWAKE))
+		return;
+
+	queue_work(b->wq, &b->input_boost);
+}
+
 void cpu_input_boost_kick(void)
 {
 	struct boost_drv *b = boost_drv_g;
@@ -245,13 +253,16 @@ void cpu_input_boost_kick(void)
 	if (!b)
 		return;
 
-	queue_work(b->wq, &b->input_boost);
+	__cpu_input_boost_kick(b);
 }
 
 static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	unsigned int duration_ms, unsigned int cpu)
 {
 	unsigned long curr_expires, new_expires;
+
+	if (!(get_boost_state(b) & SCREEN_AWAKE))
+		return;
 
 	do {
 		b->cpu = cpu;		
@@ -579,14 +590,8 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 					int value)
 {
 	struct boost_drv *b = handle->handler->private;
-	u32 state;
 
-	state = get_boost_state(b);
-
-	if (!(state & SCREEN_AWAKE))
-		return;
-
-	queue_work(b->wq, &b->input_boost);
+	__cpu_input_boost_kick(b);
 }
 
 static int cpu_input_boost_input_connect(struct input_handler *handler,
