@@ -447,7 +447,7 @@ static struct input_handler devfreq_boost_input_handler = {
 static int __init devfreq_boost_init(void)
 {
 	struct df_boost_drv *d;
-	int c, ret;
+	int i, ret;
 	cpumask_t sys_bg_mask;
 	struct sched_param param = { .sched_priority = devfreq_thread_prio};
 
