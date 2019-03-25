@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <trace/events/power.h>
 #include <linux/sched/sysctl.h>
-#include <linux/state_notifier.h>
+#include <linux/display_state.h>
 #include "sched.h"
 #include "tune.h"
 
@@ -226,7 +226,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 
 	switch(policy->cpu){
 	case 0:
-		if(state_suspended &&  silver_max_freq > 0 && silver_max_freq < freq) {
+		if(!is_display_on() &&  silver_max_freq > 0 && silver_max_freq < freq) {
 			silver_max_freq = sg_policy->tunables->silver_suspend_max_freq;
 			return silver_max_freq;
 		}
@@ -234,12 +234,12 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	case 1:
 	case 2:
 	case 3:
-		if(state_suspended)
+		if(!is_display_on())
 			return policy->min;
 		break;
 		
 	case 4:
-		if(state_suspended && gold_max_freq > 0 && gold_max_freq < freq) {
+		if(!is_display_on() && gold_max_freq > 0 && gold_max_freq < freq) {
 			gold_max_freq = sg_policy->tunables->gold_suspend_max_freq;
 			return gold_max_freq; 
 		}
@@ -247,7 +247,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	case 5:
 	case 6:
 	case 7:
-		if(state_suspended)
+		if(!is_display_on())
 			return policy->min;
 		break;
 	default:

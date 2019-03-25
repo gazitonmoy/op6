@@ -25,9 +25,6 @@
 #include <linux/project_info.h>
 #include <linux/pm_wakeup.h>
 #include "../sde/sde_trace.h"
-#ifdef CONFIG_STATE_NOTIFIER
-#include <linux/state_notifier.h>
-#endif
 #include "exposure_adjustment.h"
 #include <linux/set_os.h>
 #include <linux/klapse.h>
@@ -508,9 +505,6 @@ static int dsi_panel_power_on(struct dsi_panel *panel)
 	}
 
     mdss_dsi_disp_vci_en(panel, 1);
-    #ifdef CONFIG_STATE_NOTIFIER
-    state_resume();
-    #endif
     display_on = true;
     usleep_range(10000, 10000);
     if (!panel->lp11_init){
@@ -566,9 +560,6 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 	if (rc)
 		pr_err("[%s] failed to enable vregs, rc=%d\n", panel->name, rc);
     mdss_dsi_disp_poc_en(panel, 0);
-    #ifdef CONFIG_STATE_NOTIFIER
-    state_suspend();
-    #endif
     display_on = false;
 	return rc;
 }
