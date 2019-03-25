@@ -5,26 +5,30 @@
 
 #define pr_fmt(fmt) "devfreq_boost: " fmt
 
+#include <linux/cpu.h>
 #include <linux/devfreq_boost.h>
 #include <linux/input.h>
 #include <linux/slab.h>
+#include <linux/kthread.h>
 #include <linux/moduleparam.h>
 #include <linux/msm_drm_notify.h>
 
 static __read_mostly unsigned short flex_boost_duration = CONFIG_FLEX_DEVFREQ_BOOST_DURATION_MS;
 static __read_mostly unsigned short input_boost_duration = CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS;
+static __read_mostly unsigned int devfreq_thread_prio = CONFIG_DEVFREQ_THREAD_PRIORITY;
 
 module_param(flex_boost_duration, short, 0644);
 module_param(input_boost_duration, short, 0644);
 
 struct boost_dev {
-	struct workqueue_struct *wq;
+	struct kthread_worker worker;
+	struct task_struct *worker_thread;
 	struct devfreq *df;
-	struct work_struct input_boost;
+	struct kthread_work input_boost;
 	struct delayed_work input_unboost;
-	struct work_struct flex_boost;
+	struct kthread_work flex_boost;
 	struct delayed_work flex_unboost;
-	struct work_struct max_boost;
+	struct kthread_work max_boost;
 	struct delayed_work max_unboost;
 	unsigned long abs_min_freq;
 	unsigned long boost_freq;
@@ -54,7 +58,7 @@ static void __devfreq_boost_kick(struct boost_dev *b)
 	}
 	spin_unlock_irqrestore(&b->lock, flags);
 
-	queue_work(b->wq, &b->input_boost);
+	kthread_queue_work(&b->worker, &b->input_boost);
 }
 
 void devfreq_boost_kick(enum df_device device)
@@ -89,7 +93,7 @@ static void __devfreq_boost_kick_flex(struct boost_dev *b)
 	b->flex_boost_jiffies = msecs_to_jiffies(flex_boost_duration);
 	spin_unlock_irqrestore(&b->lock, flags);
 
-	queue_work(b->wq, &b->flex_boost);
+	kthread_queue_work(&b->worker, &b->flex_boost);
 }
 
 void devfreq_boost_kick_flex(enum df_device device)
@@ -122,7 +126,7 @@ static void __devfreq_boost_kick_max(struct boost_dev *b,
 	b->max_boost_jiffies = msecs_to_jiffies(duration_ms);
 	spin_unlock_irqrestore(&b->lock, flags);
 
-	queue_work(b->wq, &b->max_boost);
+	kthread_queue_work(&b->worker, &b->max_boost);
 }
 
 void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
@@ -198,9 +202,9 @@ static void devfreq_unboost_all(struct df_boost_drv *d)
 		if (!df)
 			continue;
 
-		cancel_work_sync(&b->max_boost);
+		kthread_cancel_work_sync(&b->max_boost);
 		cancel_delayed_work_sync(&b->max_unboost);
-		cancel_work_sync(&b->input_boost);
+		kthread_cancel_work_sync(&b->input_boost);
 		cancel_delayed_work_sync(&b->input_unboost);
 
 		mutex_lock(&df->lock);
@@ -211,7 +215,7 @@ static void devfreq_unboost_all(struct df_boost_drv *d)
 	}
 }
 
-static void devfreq_input_boost(struct work_struct *work)
+static void devfreq_input_boost(struct kthread_work *work)
 {
 	struct boost_dev *b = container_of(work, typeof(*b), input_boost);
 
@@ -232,7 +236,7 @@ static void devfreq_input_boost(struct work_struct *work)
 		mutex_unlock(&df->lock);
 	}
 
-	queue_delayed_work(b->wq, &b->input_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
 }
 
@@ -248,7 +252,7 @@ static void devfreq_input_unboost(struct work_struct *work)
 	mutex_unlock(&df->lock);
 }
 
-static void devfreq_flex_boost(struct work_struct *work)
+static void devfreq_flex_boost(struct kthread_work *work)
 {
 	struct boost_dev *b = container_of(work, typeof(*b), flex_boost);
 	unsigned long boost_jiffies;
@@ -274,7 +278,7 @@ static void devfreq_flex_boost(struct work_struct *work)
 		mutex_unlock(&df->lock);
 	}
 
-	queue_delayed_work(b->wq, &b->flex_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
 		msecs_to_jiffies(boost_jiffies));
 }
 
@@ -290,7 +294,7 @@ static void devfreq_flex_unboost(struct work_struct *work)
 	mutex_unlock(&df->lock);
 }
 
-static void devfreq_max_boost(struct work_struct *work)
+static void devfreq_max_boost(struct kthread_work *work)
 {
 	struct boost_dev *b = container_of(work, typeof(*b), max_boost);
 	unsigned long boost_jiffies, flags;
@@ -308,7 +312,7 @@ static void devfreq_max_boost(struct work_struct *work)
 	boost_jiffies = b->max_boost_jiffies;
 	spin_unlock_irqrestore(&b->lock, flags);
 
-	queue_delayed_work(b->wq, &b->max_unboost, boost_jiffies);
+	queue_delayed_work(system_power_efficient_wq, &b->max_unboost, boost_jiffies);
 }
 
 static void devfreq_max_unboost(struct work_struct *work)
@@ -443,30 +447,43 @@ static struct input_handler devfreq_boost_input_handler = {
 static int __init devfreq_boost_init(void)
 {
 	struct df_boost_drv *d;
-	struct workqueue_struct *wq;
-	int i, ret;
+	int i, c, ret;
+	cpumask_t sys_bg_mask;
+	struct sched_param param = { .sched_priority = devfreq_thread_prio};
 
 	d = kzalloc(sizeof(*d), GFP_KERNEL);
 	if (!d)
 		return -ENOMEM;
 
-	wq = alloc_workqueue("devfreq_boost_wq", WQ_HIGHPRI, 0);
-	if (!wq) {
-		ret = -ENOMEM;
-		goto free_d;
-	}
-
 	for (i = 0; i < DEVFREQ_MAX; i++) {
-		struct boost_dev *b = d->devices + i;
+		struct boost_dev *b = d->devices + i;	
+		kthread_init_worker(&b->worker);
+		b->worker_thread = kthread_run(kthread_worker_fn, &b->worker,
+				       "def_freq_boost_thread_%d",i);
+		if (IS_ERR(b->worker_thread)) {
+			ret = PTR_ERR(b->worker_thread);
+			pr_err("Failed to start kworker, err: %d\n", ret);
+			kthread_destroy_worker(&b->worker);
+		}
 
-		b->wq = wq;
+		ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
+		if (ret)
+			pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
+
+		cpumask_set_cpu(0, &sys_bg_mask);
+
+		/* Bind it to the cpumask */
+		kthread_bind_mask(b->worker_thread, &sys_bg_mask);
+		/* Wake it up */
+		wake_up_process(b->worker_thread);
+		
 		b->abs_min_freq = ULONG_MAX;
 		spin_lock_init(&b->lock);
-		INIT_WORK(&b->input_boost, devfreq_input_boost);
+		kthread_init_work(&b->input_boost, devfreq_input_boost);
 		INIT_DELAYED_WORK(&b->input_unboost, devfreq_input_unboost);
-		INIT_WORK(&b->flex_boost, devfreq_flex_boost);
+		kthread_init_work(&b->flex_boost, devfreq_flex_boost);
 		INIT_DELAYED_WORK(&b->flex_unboost, devfreq_flex_unboost);
-		INIT_WORK(&b->max_boost, devfreq_max_boost);
+		kthread_init_work(&b->max_boost, devfreq_max_boost);
 		INIT_DELAYED_WORK(&b->max_unboost, devfreq_max_unboost);
 	}
 
@@ -477,7 +494,6 @@ static int __init devfreq_boost_init(void)
 	ret = input_register_handler(&devfreq_boost_input_handler);
 	if (ret) {
 		pr_err("Failed to register input handler, err: %d\n", ret);
-		goto destroy_wq;
 	}
 
 	d->msm_drm_notif.notifier_call = msm_drm_notifier_cb;
@@ -488,14 +504,14 @@ static int __init devfreq_boost_init(void)
 		goto unregister_handler;
 	}
 
+	atomic_set(&d->screen_awake, true);
 	df_boost_drv_g = d;
+
 
 	return 0;
 
 unregister_handler:
 	input_unregister_handler(&devfreq_boost_input_handler);
-destroy_wq:
-	destroy_workqueue(wq);
 free_d:
 	kfree(d);
 	return ret;
