@@ -13,6 +13,7 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/cpu_input_boost.h>
+#include <linux/kthread.h>
 #include "../gpu/msm/kgsl.h"
 #include "../gpu/msm/kgsl_pwrscale.h"
 #include "../gpu/msm/kgsl_device.h"
@@ -28,6 +29,7 @@ static __read_mostly unsigned int flex_boost_freq_hp = CONFIG_FLEX_BOOST_FREQ_PE
 static __read_mostly unsigned int gpu_boost_freq = CONFIG_GPU_BOOST_FREQ;
 static __read_mostly unsigned int gpu_min_freq = CONFIG_GPU_MIN_FREQ;
 static __read_mostly unsigned int gpu_boost_extender_ms = CONFIG_GPU_BOOST_EXTENDER_MS;
+static __read_mostly unsigned int input_thread_prio = CONFIG_INPUT_THREAD_PRIORITY;
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 static __read_mostly short dynamic_stune_boost=20;
@@ -69,12 +71,13 @@ module_param(suspend_stune_boost, int, 0644);
 #define INPUT_GPU_BOOST		BIT(8)
 
 struct boost_drv {
-	struct workqueue_struct *wq;
-	struct work_struct input_boost;
+	struct kthread_worker worker;
+	struct task_struct *worker_thread;
+	struct kthread_work input_boost;
 	struct delayed_work input_unboost;
-	struct work_struct max_boost;
+	struct kthread_work max_boost;
 	struct delayed_work max_unboost;
-	struct work_struct flex_boost;
+	struct kthread_work flex_boost;
 	struct delayed_work flex_unboost;
 	struct delayed_work stune_extender_unboost;
 	struct delayed_work gpu_extender_unboost;
@@ -146,10 +149,12 @@ static void update_online_cpu_policy(void)
 {
 	u32 cpu;
 
-	/* Trigger cpufreq notifier for online CPUs */
+	/* Only one CPU from each cluster needs to be updated */
 	get_online_cpus();
-	for_each_online_cpu(cpu)
-		cpufreq_update_policy(cpu);
+	cpu = cpumask_first_and(cpu_lp_mask, cpu_online_mask);
+	cpufreq_update_policy(cpu);
+	cpu = cpumask_first_and(cpu_perf_mask, cpu_online_mask);
+	cpufreq_update_policy(cpu);
 	put_online_cpus();
 }
 
@@ -179,7 +184,9 @@ static void update_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=6;
 		if (freq==257)
 			level=7;
+		mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
+		mutex_unlock(&b->gpu_device->mutex);
 		set_boost_bit(b, bit);
 	}
 }
@@ -194,7 +201,9 @@ static void clear_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=7;
 		if (freq==180)
 			level=8;
+		mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
+		mutex_unlock(&b->gpu_device->mutex);
 		clear_boost_bit(b, bit);
 	}
 }
@@ -221,7 +230,7 @@ static void __cpu_input_boost_kick(struct boost_drv *b)
 	if (!(get_boost_state(b) & SCREEN_AWAKE))
 		return;
 
-	queue_work(b->wq, &b->input_boost);
+	kthread_queue_work(&b->worker, &b->input_boost);
 }
 
 void cpu_input_boost_kick(void)
@@ -243,7 +252,10 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 		return;
 
 	do {
-		b->cpu = cpu;		
+		if (cpu < 4) 
+			b->cpu = 0;
+		else
+			b->cpu = 4; 			
 		curr_expires = atomic64_read(&b->max_boost_expires);
 		new_expires = jiffies + msecs_to_jiffies(duration_ms);
 
@@ -254,7 +266,7 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 		new_expires) != curr_expires);
 
 	atomic_set(&b->max_boost_dur, duration_ms);
-	queue_work(b->wq, &b->max_boost);
+	kthread_queue_work(&b->worker, &b->max_boost);
 }
 
 void cpu_input_boost_kick_max(unsigned int duration_ms)
@@ -292,7 +304,7 @@ static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 		new_expires) != curr_expires);
 
 	atomic_set(&b->flex_boost_dur, flex_boost_duration);
-	queue_work(b->wq, &b->flex_boost);
+	kthread_queue_work(&b->worker, &b->flex_boost);
 }
 
 void cpu_input_boost_kick_flex(void)
@@ -311,7 +323,7 @@ void cpu_input_boost_kick_flex(void)
 	__cpu_input_boost_kick_flex(b);
 }
 
-static void input_boost_worker(struct work_struct *work)
+static void input_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), input_boost);
 	u32 state = get_boost_state(b);
@@ -326,7 +338,7 @@ static void input_boost_worker(struct work_struct *work)
 		update_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_boost_freq);	
 	}
 
-	queue_delayed_work(b->wq, &b->input_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
 	
 }
@@ -340,15 +352,15 @@ static void input_unboost_worker(struct work_struct *work)
 	update_online_cpu_policy();
 
 	cancel_delayed_work_sync(&b->stune_extender_unboost);
-	queue_delayed_work(b->wq, &b->stune_extender_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->stune_extender_unboost,
 		msecs_to_jiffies(stune_boost_extender_ms));
 
 	cancel_delayed_work_sync(&b->gpu_extender_unboost);
-	queue_delayed_work(b->wq, &b->gpu_extender_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->gpu_extender_unboost,
 		msecs_to_jiffies(gpu_boost_extender_ms));
 }
 
-static void max_boost_worker(struct work_struct *work)
+static void max_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), max_boost);
 	u32 state = get_boost_state(b);
@@ -361,7 +373,7 @@ static void max_boost_worker(struct work_struct *work)
 			&b->max_stune_slot);
 	}
 
-	queue_delayed_work(b->wq, &b->max_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->max_unboost,
 		msecs_to_jiffies(atomic_read(&b->max_boost_dur)));
 }
 
@@ -377,7 +389,7 @@ static void max_unboost_worker(struct work_struct *work)
 	clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
 }
 
-static void flex_boost_worker(struct work_struct *work)
+static void flex_boost_worker(struct kthread_work *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), flex_boost);
 
@@ -396,7 +408,7 @@ static void flex_boost_worker(struct work_struct *work)
 		}
 	}
 
-	queue_delayed_work(b->wq, &b->flex_unboost,
+	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
 		msecs_to_jiffies(atomic_read(&b->flex_boost_dur)));
 }
 
@@ -584,23 +596,40 @@ static int __init cpu_input_boost_init(void)
 {
 	struct boost_drv *b;
 	int ret;
+	struct sched_param param = { .sched_priority = input_thread_prio};
+	cpumask_t sys_bg_mask;
 
 	b = kzalloc(sizeof(*b), GFP_KERNEL);
 	if (!b)
 		return -ENOMEM;
 
-	b->wq = alloc_workqueue("cpu_input_boost_wq", WQ_HIGHPRI, 0);
-	if (!b->wq) {
-		ret = -ENOMEM;
+	kthread_init_worker(&b->worker);
+	b->worker_thread = kthread_run(kthread_worker_fn, &b->worker,
+				       "cpu_input_boost_thread");
+	if (IS_ERR(b->worker_thread)) {
+		ret = PTR_ERR(b->worker_thread);
+		pr_err("Failed to start kworker, err: %d\n", ret);
 		goto free_b;
 	}
 
+	ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
+	if (ret)
+		pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
+
+	cpumask_set_cpu(0, &sys_bg_mask);
+
+	/* Bind it to the cpumask */
+	kthread_bind_mask(b->worker_thread, &sys_bg_mask);
+
+	/* Wake it up */
+	wake_up_process(b->worker_thread);
+
 	atomic64_set(&b->max_boost_expires, 0);
-	INIT_WORK(&b->input_boost, input_boost_worker);
+	kthread_init_work(&b->input_boost, input_boost_worker);
 	INIT_DELAYED_WORK(&b->input_unboost, input_unboost_worker);
-	INIT_WORK(&b->max_boost, max_boost_worker);
+	kthread_init_work(&b->max_boost, max_boost_worker);
 	INIT_DELAYED_WORK(&b->max_unboost, max_unboost_worker);
-	INIT_WORK(&b->flex_boost, flex_boost_worker);
+	kthread_init_work(&b->flex_boost, flex_boost_worker);
 	INIT_DELAYED_WORK(&b->flex_unboost, flex_unboost_worker);
 	INIT_DELAYED_WORK(&b->stune_extender_unboost, stune_extender_unboost_worker);
 	INIT_DELAYED_WORK(&b->gpu_extender_unboost, gpu_extender_unboost_worker);
@@ -626,7 +655,7 @@ static int __init cpu_input_boost_init(void)
 	b->msm_drm_notif.priority = INT_MAX;
 	ret = msm_drm_register_client(&b->msm_drm_notif);
 	if (ret) {
-		pr_err("Failed to register dsi_panel_notifier, err: %d\n", ret);
+		pr_err("Failed to register msm_drm_notifier, err: %d\n", ret);
 		goto unregister_handler;
 	}
 
@@ -645,7 +674,7 @@ unregister_handler:
 unregister_cpu_notif:
 	cpufreq_unregister_notifier(&b->cpu_notif, CPUFREQ_POLICY_NOTIFIER);
 destroy_wq:
-	destroy_workqueue(b->wq);
+	kthread_destroy_worker(&b->worker);
 free_b:
 	kfree(b);
 	return ret;

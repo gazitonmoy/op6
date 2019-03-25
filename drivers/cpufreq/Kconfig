@@ -593,6 +593,11 @@ config SUSPEND_STUNE_BOOST
 	  of process groups in order to bias core selection as well as CPU
 	  frequency selection. A value of 0 disables this functionality.
 
+config INPUT_THREAD_PRIORITY
+	int "Input hread priority"
+	depends on DYNAMIC_STUNE_BOOST
+	default "25"
+
 endif
 
 comment "CPU frequency scaling drivers"
