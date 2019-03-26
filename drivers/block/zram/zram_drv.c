@@ -40,15 +40,7 @@ static DEFINE_IDR(zram_index_idr);
 static DEFINE_MUTEX(zram_index_mutex);
 
 static int zram_major;
-#if defined(CONFIG_CRYPTO_ZSTD)
-static const char *default_compressor = "zstd";
-#elif defined(CONFIG_CRYPTO_LZ4)
-static const char *default_compressor = "lz4";
-#elif defined(CONFIG_CRYPTO_LZ4HC)
-static const char *default_compressor = "lz4hc";
-#else
-static const char *default_compressor = "lzo";
-#endif
+static const char *default_compressor = CONFIG_ZRAM_DEFAULT_COMPRESSOR;
 
 #define BACKEND_PAR_BUF_SIZE	32
 static char backend_par_buf[BACKEND_PAR_BUF_SIZE];
@@ -63,6 +55,11 @@ static char backend_par_buf[BACKEND_PAR_BUF_SIZE];
 static unsigned int num_devices = 1;
 
 static void zram_free_page(struct zram *zram, size_t index);
+
+static int zram_slot_trylock(struct zram *zram, u32 index)
+{
+	return bit_spin_trylock(ZRAM_LOCK, &zram->table[index].value);
+}
 
 static void zram_slot_lock(struct zram *zram, u32 index)
 {
@@ -417,7 +414,6 @@ static ssize_t backing_dev_store(struct device *dev,
 		goto out;
 
 	reset_bdev(zram);
-	spin_lock_init(&zram->bitmap_lock);
 
 	zram->old_block_size = old_block_size;
 	zram->bdev = bdev;
@@ -449,29 +445,24 @@ out:
 
 static unsigned long get_entry_bdev(struct zram *zram)
 {
-	unsigned long entry;
-
-	spin_lock(&zram->bitmap_lock);
+	unsigned long blk_idx = 1;
+retry:
 	/* skip 0 bit to confuse zram.handle = 0 */
-	entry = find_next_zero_bit(zram->bitmap, zram->nr_pages, 1);
-	if (entry == zram->nr_pages) {
-		spin_unlock(&zram->bitmap_lock);
+	blk_idx = find_next_zero_bit(zram->bitmap, zram->nr_pages, blk_idx);
+	if (blk_idx == zram->nr_pages)
 		return 0;
-	}
 
-	set_bit(entry, zram->bitmap);
-	spin_unlock(&zram->bitmap_lock);
+	if (test_and_set_bit(blk_idx, zram->bitmap))
+		goto retry;
 
-	return entry;
+	return blk_idx;
 }
 
 static void put_entry_bdev(struct zram *zram, unsigned long entry)
 {
 	int was_set;
 
-	spin_lock(&zram->bitmap_lock);
 	was_set = test_and_clear_bit(entry, zram->bitmap);
-	spin_unlock(&zram->bitmap_lock);
 	WARN_ON_ONCE(!was_set);
 }
 
@@ -662,7 +653,7 @@ static void zram_accessed(struct zram *zram, u32 index)
 
 static void zram_reset_access(struct zram *zram, u32 index)
 {
-	zram->table[index].ac_time.tv64 = 0;
+	zram->table[index].ac_time = 0;
 }
 
 static ssize_t read_block_state(struct file *file, char __user *buf,
@@ -896,9 +887,10 @@ static ssize_t debug_stat_show(struct device *dev,
 
 	down_read(&zram->init_lock);
 	ret = scnprintf(buf, PAGE_SIZE,
-			"version: %d\n%8llu\n",
+			"version: %d\n%8llu %8llu\n",
 			version,
-			(u64)atomic64_read(&zram->stats.writestall));
+			(u64)atomic64_read(&zram->stats.writestall),
+			(u64)atomic64_read(&zram->stats.miss_free));
 	up_read(&zram->init_lock);
 
 	return ret;
@@ -927,7 +919,7 @@ static bool zram_meta_alloc(struct zram *zram, u64 disksize)
 	char *backend = CONFIG_ZRAM_DEFAULT_POOL;
 
 	num_pages = disksize >> PAGE_SHIFT;
-	zram->table = vzalloc(array_size(num_pages, sizeof(*zram->table)));
+	zram->table = vzalloc(num_pages * sizeof(*zram->table));
 	if (!zram->table)
 		return false;
 
@@ -1415,10 +1407,14 @@ static void zram_slot_free_notify(struct block_device *bdev,
 
 	zram = bdev->bd_disk->private_data;
 
-	zram_slot_lock(zram, index);
+	atomic64_inc(&zram->stats.notify_free);
+	if (!zram_slot_trylock(zram, index)) {
+		atomic64_inc(&zram->stats.miss_free);
+		return;
+	}
+
 	zram_free_page(zram, index);
 	zram_slot_unlock(zram, index);
-	atomic64_inc(&zram->stats.notify_free);
 }
 
 static int zram_rw_page(struct block_device *bdev, sector_t sector,
@@ -1703,7 +1699,7 @@ static int zram_add(void)
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
 	__set_bit(QUEUE_FLAG_FAST, &zram->disk->queue->queue_flags);
-	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
+	/* Actual capacity set using sysfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
 	/* zram devices sort of resembles non-rotational disks */
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, zram->disk->queue);
@@ -1737,7 +1733,7 @@ static int zram_add(void)
 	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, zram->disk->queue);
 
 	zram->disk->queue->backing_dev_info->capabilities |=
-			(BDI_CAP_STABLE_WRITES | BDI_CAP_SYNCHRONOUS_IO);
+					BDI_CAP_STABLE_WRITES;
 	disk_to_dev(zram->disk)->groups = zram_disk_attr_groups;
 	add_disk(zram->disk);
 
