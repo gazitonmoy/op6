@@ -76,8 +76,8 @@ static DEFINE_RWLOCK(binfmt_lock);
 
 #define ZYGOTE32_BIN	"/system/bin/app_process32"
 #define ZYGOTE64_BIN	"/system/bin/app_process64"
-static atomic_t zygote32_pid;
-static atomic_t zygote64_pid;
+static pid_t zygote32_pid;
+static pid_t zygote64_pid;
 
 bool is_zygote_pid(pid_t pid)
 {
