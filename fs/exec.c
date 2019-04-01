@@ -81,8 +81,7 @@ static atomic_t zygote64_pid;
 
 bool is_zygote_pid(pid_t pid)
 {
-	return atomic_read(&zygote32_pid) == pid ||
-		atomic_read(&zygote64_pid) == pid;
+	return pid == zygote32_pid || pid == zygote64_pid;
 }
 
 void __register_binfmt(struct linux_binfmt * fmt, int insert)
@@ -1810,9 +1809,9 @@ static int do_execveat_common(int fd, struct filename *filename,
 
 	if (capable(CAP_SYS_ADMIN)) {
 		if (unlikely(!strcmp(filename->name, ZYGOTE32_BIN)))
-			atomic_set(&zygote32_pid, current->pid);
+			zygote32_pid = current->pid;
 		else if (unlikely(!strcmp(filename->name, ZYGOTE64_BIN)))
-			atomic_set(&zygote64_pid, current->pid);
+			zygote64_pid = current->pid;
 	}
 
 	/* execve succeeded */
