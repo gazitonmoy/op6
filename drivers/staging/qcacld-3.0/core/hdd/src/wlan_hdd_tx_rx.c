@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1088,15 +1088,17 @@ drop_pkt_and_release_skb:
 	qdf_net_buf_debug_release_skb(skb);
 drop_pkt:
 
-	/* track connectivity stats */
-	if (pAdapter->pkt_type_bitmap)
-		hdd_tx_rx_collect_connectivity_stats_info(skb, pAdapter,
-							  PKT_TYPE_TX_DROPPED,
-							  &pkt_type);
+	if (skb) {
+		/* track connectivity stats */
+		if (pAdapter->pkt_type_bitmap)
+			hdd_tx_rx_collect_connectivity_stats_info(skb, pAdapter,
+						PKT_TYPE_TX_DROPPED, &pkt_type);
 
-	qdf_dp_trace_data_pkt(skb, QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
-			      QDF_TX);
-	kfree_skb(skb);
+		qdf_dp_trace_data_pkt(skb, QDF_DP_TRACE_DROP_PACKET_RECORD, 0,
+				      QDF_TX);
+		kfree_skb(skb);
+		skb = NULL;
+	}
 
 drop_pkt_accounting:
 
@@ -1475,6 +1477,66 @@ static bool hdd_is_duplicate_ip_arp(struct sk_buff *skb)
 	return false;
 }
 
+/**
+ * hdd_is_arp_local() - check if local or non local arp
+ * @skb: pointer to sk_buff
+ *
+ * Return: true if local arp or false otherwise.
+ */
+static bool hdd_is_arp_local(struct sk_buff *skb)
+{
+	struct arphdr *arp;
+	struct in_ifaddr **ifap = NULL;
+	struct in_ifaddr *ifa = NULL;
+	struct in_device *in_dev;
+	unsigned char *arp_ptr;
+	__be32 tip;
+
+	arp = (struct arphdr *)skb->data;
+	if (arp->ar_op == htons(ARPOP_REQUEST)) {
+		in_dev = __in_dev_get_rtnl(skb->dev);
+		if (in_dev) {
+			for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
+				ifap = &ifa->ifa_next) {
+				if (!strcmp(skb->dev->name, ifa->ifa_label))
+					break;
+			}
+		}
+
+		if (ifa && ifa->ifa_local) {
+			arp_ptr = (unsigned char *)(arp + 1);
+			arp_ptr += (skb->dev->addr_len + 4 +
+					skb->dev->addr_len);
+			memcpy(&tip, arp_ptr, 4);
+			hdd_debug("ARP packet: local IP: %x dest IP: %x",
+				ifa->ifa_local, tip);
+			if (ifa->ifa_local == tip)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * hdd_is_rx_wake_lock_needed() - check if wake lock is needed
+ * @skb: pointer to sk_buff
+ *
+ * RX wake lock is needed for:
+ * 1) Unicast data packet OR
+ * 2) Local ARP data packet
+ *
+ * Return: true if wake lock is needed or false otherwise.
+ */
+static bool hdd_is_rx_wake_lock_needed(struct sk_buff *skb)
+{
+	if ((skb->pkt_type != PACKET_BROADCAST &&
+	     skb->pkt_type != PACKET_MULTICAST) || hdd_is_arp_local(skb))
+		return true;
+
+	return false;
+}
+
 #ifdef WLAN_FEATURE_TSF_PLUS
 static inline void hdd_tsf_timestamp_rx(hdd_context_t *hdd_ctx,
 					qdf_nbuf_t netbuf,
@@ -1835,6 +1897,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	struct sk_buff *skb = NULL;
 	hdd_station_ctx_t *pHddStaCtx = NULL;
 	unsigned int cpu_index;
+	bool wake_lock = false;
 	bool is_arp = false;
 	bool track_arp = false;
 	uint8_t pkt_type = 0;
@@ -1929,6 +1992,20 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 			"%s: Dropping multicast replay pkt", __func__);
 		qdf_nbuf_free(skb);
 		return QDF_STATUS_SUCCESS;
+	}
+
+	/* hold configurable wakelock for unicast traffic */
+	if (pHddCtx->config->rx_wakelock_timeout &&
+	    pHddStaCtx->conn_info.uIsAuthenticated)
+		wake_lock = hdd_is_rx_wake_lock_needed(skb);
+
+	if (wake_lock) {
+		cds_host_diag_log_work(&pHddCtx->rx_wake_lock,
+				       pHddCtx->config->rx_wakelock_timeout,
+				       WIFI_POWER_EVENT_WAKELOCK_HOLD_RX);
+		qdf_wake_lock_timeout_acquire(&pHddCtx->rx_wake_lock,
+					      pHddCtx->config->
+						      rx_wakelock_timeout);
 	}
 
 	/* Remove SKB from internal tracking table before submitting
@@ -2163,7 +2240,6 @@ void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
 	enum netif_action_type action, enum netif_reason_type reason)
 {
 	uint32_t temp_map;
-	uint8_t index;
 
 	if ((!adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) ||
 		 (!adapter->dev)) {
@@ -2263,18 +2339,20 @@ void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
 	spin_lock_bh(&adapter->pause_map_lock);
 	if (adapter->pause_map & (1 << WLAN_PEER_UNAUTHORISED))
 		wlan_hdd_process_peer_unauthorised_pause(adapter);
-
-	index = adapter->history_index++;
-	if (adapter->history_index == WLAN_HDD_MAX_HISTORY_ENTRY)
-		adapter->history_index = 0;
 	spin_unlock_bh(&adapter->pause_map_lock);
 
 	wlan_hdd_update_queue_oper_stats(adapter, action, reason);
 
-	adapter->queue_oper_history[index].time = qdf_system_ticks();
-	adapter->queue_oper_history[index].netif_action = action;
-	adapter->queue_oper_history[index].netif_reason = reason;
-	adapter->queue_oper_history[index].pause_map = adapter->pause_map;
+	adapter->queue_oper_history[adapter->history_index].time =
+							qdf_system_ticks();
+	adapter->queue_oper_history[adapter->history_index].netif_action =
+									action;
+	adapter->queue_oper_history[adapter->history_index].netif_reason =
+									reason;
+	adapter->queue_oper_history[adapter->history_index].pause_map =
+							adapter->pause_map;
+	if (++adapter->history_index == WLAN_HDD_MAX_HISTORY_ENTRY)
+		adapter->history_index = 0;
 }
 
 /**
