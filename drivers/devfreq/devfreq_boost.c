@@ -79,17 +79,10 @@ static void __devfreq_boost_kick_flex(struct boost_dev *b)
 	unsigned long flags, new_expires;
 
 	spin_lock_irqsave(&b->lock, flags);
-	if (!b->df || b->df) {
+	if (!b->df) {
 		spin_unlock_irqrestore(&b->lock, flags);
 		return;
 	}
-
-	new_expires = jiffies + b->flex_boost_jiffies;
-	if (time_after(b->flex_boost_expires, new_expires)) {
-		spin_unlock_irqrestore(&b->lock, flags);
-		return;
-	}
-	b->flex_boost_expires = new_expires;
 	b->flex_boost_jiffies = msecs_to_jiffies(flex_boost_duration);
 	spin_unlock_irqrestore(&b->lock, flags);
 
