@@ -514,6 +514,14 @@ config REMOVE_INPUT_BOOST_FREQ_PERF
 	  of using a higher than cpuinfo.min_freq (e.g. OnePlus 5/5T/6)
 	  this frequency will be used.
 
+config  MAX_BOOST_FREQ_LP
+	int "Low-power cluster max frequency"
+	default "1766400"
+
+config  MAX_BOOST_FREQ_PERF
+	int "Performance cluster cluster max frequency"
+	default "2803200"
+
 config FLEX_BOOST_FREQ_LP
 	int "Low-power cluster general boost freq"
 	default "0"
