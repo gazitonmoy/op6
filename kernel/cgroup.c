@@ -2968,8 +2968,8 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 	if (!ret && !threadgroup &&
 	    !strcmp(of->kn->parent->name, "top-app") &&
 	    is_zygote_pid(tsk->parent->pid)) {
-		cpu_input_boost_kick_max(750);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 750);
+		cpu_input_boost_kick_max(1000);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
 	}
 
 	put_task_struct(tsk);
