@@ -76,7 +76,7 @@ void devfreq_boost_kick(enum df_device device)
 
 static void __devfreq_boost_kick_flex(struct boost_dev *b)
 {
-	unsigned long flags, new_expires;
+	unsigned long flags;
 
 	spin_lock_irqsave(&b->lock, flags);
 	if (!b->df) {
@@ -229,7 +229,7 @@ static void devfreq_input_boost(struct kthread_work *work)
 		mutex_unlock(&df->lock);
 	}
 
-	queue_delayed_work(system_power_efficient_wq, &b->input_unboost,
+	queue_delayed_work(system_unbound_wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
 }
 
@@ -271,7 +271,7 @@ static void devfreq_flex_boost(struct kthread_work *work)
 		mutex_unlock(&df->lock);
 	}
 
-	queue_delayed_work(system_power_efficient_wq, &b->flex_unboost,
+	queue_delayed_work(system_unbound_wq, &b->flex_unboost,
 		msecs_to_jiffies(boost_jiffies));
 }
 
@@ -305,7 +305,7 @@ static void devfreq_max_boost(struct kthread_work *work)
 	boost_jiffies = b->max_boost_jiffies;
 	spin_unlock_irqrestore(&b->lock, flags);
 
-	queue_delayed_work(system_power_efficient_wq, &b->max_unboost, boost_jiffies);
+	queue_delayed_work(system_unbound_wq, &b->max_unboost, boost_jiffies);
 }
 
 static void devfreq_max_unboost(struct work_struct *work)
@@ -440,7 +440,7 @@ static struct input_handler devfreq_boost_input_handler = {
 static int __init devfreq_boost_init(void)
 {
 	struct df_boost_drv *d;
-	int i, c, ret;
+	int i, ret, c;
 	cpumask_t sys_bg_mask;
 	struct sched_param param = { .sched_priority = devfreq_thread_prio};
 
@@ -463,8 +463,8 @@ static int __init devfreq_boost_init(void)
 		ret = sched_setscheduler(b->worker_thread, SCHED_FIFO, &param);
 		if (ret)
 			pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
-
-		for (c = 0; c < 4; c++) 
+		
+		for (c = 0; c < 7; c++) 
 			cpumask_set_cpu(c, &sys_bg_mask);
 
 		/* Bind it to the cpumask */
@@ -492,7 +492,7 @@ static int __init devfreq_boost_init(void)
 	}
 
 	d->msm_drm_notif.notifier_call = msm_drm_notifier_cb;
-	d->msm_drm_notif.priority = INT_MAX;
+	d->msm_drm_notif.priority = INT_MAX - 2;
 	ret = msm_drm_register_client(&d->msm_drm_notif);
 	if (ret) {
 		pr_err("Failed to register dsi_panel_notifier, err: %d\n", ret);
