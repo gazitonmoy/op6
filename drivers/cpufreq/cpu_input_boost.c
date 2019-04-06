@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2018 Sultan Alsawaf <sultan@kerneltoast.com>.
  */
-// Copyright (C) 2019 GPU input boost, Erik Müller <pappschlumpf@xda>
+// Copyright (C) 2019 GPU input boost, stune boost, Erik Müller <pappschlumpf@xda>
 
 #define pr_fmt(fmt) "cpu_input_boost: " fmt
 
@@ -28,7 +28,6 @@ static __read_mostly unsigned int flex_boost_freq_lp = CONFIG_FLEX_BOOST_FREQ_LP
 static __read_mostly unsigned int flex_boost_freq_hp = CONFIG_FLEX_BOOST_FREQ_PERF;
 static __read_mostly unsigned int gpu_boost_freq = CONFIG_GPU_BOOST_FREQ;
 static __read_mostly unsigned int gpu_min_freq = CONFIG_GPU_MIN_FREQ;
-static __read_mostly unsigned int gpu_boost_extender_ms = CONFIG_GPU_BOOST_EXTENDER_MS;
 static __read_mostly unsigned int input_thread_prio = CONFIG_INPUT_THREAD_PRIORITY;
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
@@ -36,17 +35,14 @@ static __read_mostly short dynamic_stune_boost=20;
 static __read_mostly short input_stune_boost_offset = CONFIG_INPUT_BOOST_STUNE_OFFSET;
 static __read_mostly short max_stune_boost_offset = CONFIG_MAX_BOOST_STUNE_OFFSET;
 static __read_mostly short flex_stune_boost_offset = CONFIG_FLEX_BOOST_STUNE_OFFSET;
-static __read_mostly unsigned short stune_boost_extender_ms = CONFIG_STUNE_BOOST_EXTENDER_MS;
 static __read_mostly int suspend_stune_boost = CONFIG_SUSPEND_STUNE_BOOST;
 
 module_param(dynamic_stune_boost, short, 0644);
 module_param(input_stune_boost_offset, short, 0644);
 module_param(max_stune_boost_offset, short, 0644);
 module_param(flex_stune_boost_offset, short, 0644);
-module_param(stune_boost_extender_ms, short, 0644);
 module_param(gpu_boost_freq, uint, 0644);
 module_param(gpu_min_freq, uint, 0644);
-module_param(gpu_boost_extender_ms, uint, 0644);
 #endif
 
 module_param(input_boost_freq_lp, uint, 0644);
@@ -69,6 +65,7 @@ module_param(suspend_stune_boost, int, 0644);
 #define MAX_STUNE_BOOST		BIT(6)
 #define FLEX_STUNE_BOOST	BIT(7)
 #define INPUT_GPU_BOOST		BIT(8)
+#define GPU_INPUT_BOOST		BIT(9)
 
 struct boost_drv {
 	struct delayed_work input_unboost;
@@ -84,6 +81,7 @@ struct boost_drv {
 	atomic64_t max_boost_expires;
 	atomic64_t flex_boost_expires;
 	atomic_t state;
+	int root_stune_default;
 	int input_stune_slot;
 	int max_stune_slot;
 	int flex_stune_slot;
@@ -191,16 +189,18 @@ static void thread_update_stune_boost(struct boost_drv *b, u32 state)
 		return;
 	}
 
-	if (state & MAX_BOOST) 
+	if (state & MAX_BOOST) {
 		update_stune_boost(b, state, MAX_STUNE_BOOST, dynamic_stune_boost+max_stune_boost_offset,
 			&b->max_stune_slot);	
-	else 
+		return;
+	} else 
 		clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
 
-	if (state & INPUT_BOOST && !(state & MAX_BOOST)) 
+	if (state & INPUT_BOOST && !(state & MAX_BOOST)) {
 		update_stune_boost(b, state, INPUT_STUNE_BOOST, dynamic_stune_boost+input_stune_boost_offset,
 			&b->input_stune_slot);
-	else
+		return;
+	} else
 		clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
 
 	if (state & FLEX_BOOST && !(state & MAX_BOOST) && !(state & INPUT_BOOST))
@@ -219,9 +219,9 @@ static void update_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=6;
 		if (freq==257)
 			level=7;
-		mutex_lock(&b->gpu_device->mutex);
+		//mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
-		mutex_unlock(&b->gpu_device->mutex);
+		//mutex_unlock(&b->gpu_device->mutex);
 		set_boost_bit(b, bit);
 	}
 }
@@ -236,17 +236,22 @@ static void clear_gpu_boost(struct boost_drv *b, u32 state, u32 bit, int freq)
 			level=7;
 		if (freq==180)
 			level=8;
-		mutex_lock(&b->gpu_device->mutex);
+		//mutex_lock(&b->gpu_device->mutex);
 		b->gpu_pwr->min_pwrlevel=level;
-		mutex_unlock(&b->gpu_device->mutex);
+		//mutex_unlock(&b->gpu_device->mutex);
 		clear_boost_bit(b, bit);
 	}
 }
 
 static void thread_update_gpu_boost(struct boost_drv *b, u32 state, int freq)
 {
-	if (state & INPUT_BOOST)
-		update_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_boost_freq);	
+	if (state & SCREEN_OFF) {
+		clear_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_min_freq);
+		return;
+	}
+
+	if (state & GPU_INPUT_BOOST)
+		update_gpu_boost(b, state, INPUT_GPU_BOOST, freq);	
 	else
 		clear_gpu_boost(b, state, INPUT_GPU_BOOST, gpu_min_freq);	
 }
@@ -257,7 +262,7 @@ static void __cpu_input_boost_kick(struct boost_drv *b)
 		return;
 
 	set_boost_bit(b, INPUT_BOOST);
-	set_boost_bit(b, INPUT_GPU_BOOST);
+	set_boost_bit(b, GPU_INPUT_BOOST);
 	wake_up(&b->boost_waitq);
 	mod_delayed_work(system_unbound_wq, &b->input_unboost,
 			 msecs_to_jiffies(input_boost_duration));
@@ -329,8 +334,6 @@ static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 	set_boost_bit(b, FLEX_BOOST);
 	wake_up(&b->boost_waitq);
 	mod_delayed_work(system_unbound_wq, &b->flex_unboost, flex_boost_duration);
-
-
 }
 
 void cpu_input_boost_kick_flex(void)
@@ -349,7 +352,7 @@ static void input_unboost_worker(struct work_struct *work)
 					   typeof(*b), input_unboost);
 
 	clear_boost_bit(b, INPUT_BOOST);
-	clear_boost_bit(b, INPUT_GPU_BOOST);
+	clear_boost_bit(b, GPU_INPUT_BOOST);
 	wake_up(&b->boost_waitq);
 }
 
@@ -373,13 +376,12 @@ static void flex_unboost_worker(struct work_struct *work)
 
 static int cpu_boost_thread(void *data)
 {
-	static const struct sched_param sched_max_rt_prio = {
-		.sched_priority = MAX_RT_PRIO - 1
-	};
+	struct sched_param param = { .sched_priority = input_thread_prio};
+
 	struct boost_drv *b = data;
 	u32 old_state = 0;
 
-	sched_setscheduler_nocheck(current, SCHED_FIFO, &sched_max_rt_prio);
+	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
 
 	while (!kthread_should_stop()) {
 		u32 curr_state;
@@ -393,7 +395,7 @@ static int cpu_boost_thread(void *data)
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 		thread_update_stune_boost(b, curr_state);
 #endif
-		update_gpu_boost(b, curr_state, gpu_boost_freq);
+		thread_update_gpu_boost(b, curr_state, gpu_boost_freq);
 	}
 
 	return 0;
@@ -421,7 +423,6 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 	if (state & MAX_BOOST) {
 		if (b->cpu == -1) {
 			policy->min = get_max_boost_freq(policy);
-			b->cpu = 9;
 			return NOTIFY_OK;
 		}
 		if (b->cpu == policy->cpu) {
@@ -462,10 +463,13 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK_CUST) {
 		clear_boost_bit(b, SCREEN_OFF);
+		set_stune_boost("/", b->root_stune_default, NULL);
 		__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, -1);
 	} else {
 		set_boost_bit(b, SCREEN_OFF);
 		wake_up(&b->boost_waitq);
+		set_stune_boost("/", suspend_stune_boost,
+			&b->root_stune_default);
 	}
 
 	return NOTIFY_OK;
@@ -557,7 +561,8 @@ static int __init cpu_input_boost_init(void)
 {
 	struct task_struct *boost_thread;
 	struct boost_drv *b;
-	int ret;
+	int ret, c;
+	cpumask_t sys_bg_mask;
 
 	b = kzalloc(sizeof(*b), GFP_KERNEL);
 	if (!b)
@@ -569,6 +574,7 @@ static int __init cpu_input_boost_init(void)
 	atomic64_set(&b->max_boost_expires, 0);
 	INIT_DELAYED_WORK(&b->flex_unboost, flex_unboost_worker);
 	atomic_set(&b->state, 0);
+	b->root_stune_default = 0;
 
 	b->cpu_notif.notifier_call = cpu_notifier_cb;
 	b->cpu_notif.priority = INT_MAX - 2;
@@ -586,7 +592,7 @@ static int __init cpu_input_boost_init(void)
 	}
 
 	b->msm_drm_notif.notifier_call = msm_drm_notifier_cb;
-	b->msm_drm_notif.priority = INT_MAX;
+	b->msm_drm_notif.priority = INT_MAX - 2;
 	ret = msm_drm_register_client(&b->msm_drm_notif);
 	if (ret) {
 		pr_err("Failed to register msm_drm notifier, err: %d\n", ret);
@@ -595,6 +601,13 @@ static int __init cpu_input_boost_init(void)
 
 	boost_thread = kthread_run(cpu_boost_thread, b,
 						 "cpu_boostd");
+
+	for (c = 0; c < 7; c++) 
+		cpumask_set_cpu(c, &sys_bg_mask);
+
+	/* Bind it to the cpumask */
+	kthread_bind_mask(boost_thread, &sys_bg_mask);
+
 	if (IS_ERR(boost_thread)) {
 		pr_err("Failed to start CPU boost thread, err: %ld\n",
 		       PTR_ERR(boost_thread));
