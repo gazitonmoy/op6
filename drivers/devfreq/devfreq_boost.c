@@ -464,7 +464,7 @@ static int __init devfreq_boost_init(void)
 		if (ret)
 			pr_err("Failed to set SCHED_FIFO on kworker, err: %d\n", ret);
 		
-		for (c = 0; c < 7; c++) 
+		for (c = 0; c < 4; c++) 
 			cpumask_set_cpu(c, &sys_bg_mask);
 
 		/* Bind it to the cpumask */
