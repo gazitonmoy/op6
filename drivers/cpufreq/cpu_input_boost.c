@@ -602,7 +602,7 @@ static int __init cpu_input_boost_init(void)
 	boost_thread = kthread_run(cpu_boost_thread, b,
 						 "cpu_boostd");
 
-	for (c = 0; c < 7; c++) 
+	for (c = 0; c < 4; c++) 
 		cpumask_set_cpu(c, &sys_bg_mask);
 
 	/* Bind it to the cpumask */
