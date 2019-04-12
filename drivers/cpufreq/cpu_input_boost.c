@@ -186,10 +186,11 @@ static void thread_update_stune_boost(struct boost_drv *b, u32 state)
 		clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
 		clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
 		clear_stune_boost(b, state, FLEX_STUNE_BOOST, b->flex_stune_slot);
-		return;
+		if (!(state & WAKE_BOOST)) 
+			return;
 	}
 
-	if (state & MAX_BOOST) {
+	if (state & (MAX_BOOST | WAKE_BOOST)) {
 		update_stune_boost(b, state, MAX_STUNE_BOOST, dynamic_stune_boost+max_stune_boost_offset,
 			&b->max_stune_slot);	
 		return;
@@ -326,6 +327,25 @@ void cluster_input_boost_kick_max(unsigned int duration_ms, int cpu)
 	__cpu_input_boost_kick_max(b, duration_ms, cpu);
 }
 
+static void __cpu_input_boost_kick_wake(struct boost_drv *b)
+{
+	if (!(get_boost_state(b) & SCREEN_OFF))
+		return;
+
+	set_boost_bit(b, WAKE_BOOST);
+	__cpu_input_boost_kick_max(b, CONFIG_WAKE_BOOST_DURATION_MS, -1);
+}
+
+void cpu_input_boost_kick_wake(void)
+{
+	struct boost_drv *b = boost_drv_g;
+
+	if (!b)
+		return;
+
+	__cpu_input_boost_kick_wake(b);
+}
+
 static void __cpu_input_boost_kick_flex(struct boost_drv *b)
 {
 	if (get_boost_state(b) & SCREEN_OFF)
@@ -412,6 +432,12 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_OK;
 
 	state = get_boost_state(b);
+
+	/* wake boost */
+	if (state & WAKE_BOOST) {
+		policy->min = get_max_boost_freq(policy);
+		return NOTIFY_OK;
+	}
 
 	/* Unboost when the screen is off */
 	if (state & SCREEN_OFF) {
