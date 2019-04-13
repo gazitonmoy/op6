@@ -183,9 +183,6 @@ static void clear_stune_boost(struct boost_drv *b, u32 state, u32 bit, int slot)
 static void thread_update_stune_boost(struct boost_drv *b, u32 state)
 {
 	if (state & SCREEN_OFF) {
-		clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
-		clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
-		clear_stune_boost(b, state, FLEX_STUNE_BOOST, b->flex_stune_slot);
 		if (!(state & WAKE_BOOST)) 
 			return;
 	}
@@ -288,11 +285,15 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	if (get_boost_state(b) & SCREEN_OFF)
 		return;
 
-	do {
-		if (cpu < 4) 
-			b->cpu = 0;
-		else
-			b->cpu = 4; 			
+	do {	
+		if (cpu != -1) {
+			if (cpu < 4) 
+				b->cpu = 0;
+			else
+				b->cpu = 4;
+		} else 
+			b->cpu = -1;		
+		
 		curr_expires = atomic64_read(&b->max_boost_expires);
 		new_expires = jiffies + boost_jiffies;
 
@@ -441,7 +442,8 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 
 	/* Unboost when the screen is off */
 	if (state & SCREEN_OFF) {
-		policy->min = policy->cpuinfo.min_freq;
+		min_freq = get_min_freq(b, policy->cpu);
+		policy->min = max(policy->cpuinfo.min_freq, min_freq);
 		return NOTIFY_OK;
 	}
 
@@ -450,9 +452,8 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 		if (b->cpu == -1) {
 			policy->min = get_max_boost_freq(policy);
 			return NOTIFY_OK;
-		}
-		if (b->cpu == policy->cpu) {
-			policy->min = policy->max;
+		} else if (b->cpu == policy->cpu) {
+			policy->min = get_max_boost_freq(policy);
 			b->cpu = 9;
 			return NOTIFY_OK;
 		}
@@ -480,6 +481,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 {
 	struct boost_drv *b = container_of(nb, typeof(*b), msm_drm_notif);
 	struct msm_drm_notifier *evdata = data;
+	u32 state;
 	int *blank = evdata->data;
 
 	/* Parse framebuffer blank events as soon as they occur */
@@ -494,6 +496,10 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 	} else {
 		set_boost_bit(b, SCREEN_OFF);
 		wake_up(&b->boost_waitq);
+		state = get_boost_state(b);
+		clear_stune_boost(b, state, MAX_STUNE_BOOST, b->max_stune_slot);
+		clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
+		clear_stune_boost(b, state, FLEX_STUNE_BOOST, b->flex_stune_slot);
 		set_stune_boost("/", suspend_stune_boost,
 			&b->root_stune_default);
 	}
