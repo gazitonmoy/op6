@@ -139,7 +139,7 @@ struct fp_underscreen_info {
 };
 
 /******************for Red function*****************/
-#define CONFIG_SYNAPTIC_RED
+//#define CONFIG_SYNAPTIC_RED
 
 /*********************for gesture*******************/
 #ifdef SUPPORT_GESTURE
