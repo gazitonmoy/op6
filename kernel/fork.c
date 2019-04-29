@@ -2005,6 +2005,11 @@ long _do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long nr;
 
+	if (task_is_zygote(current)) {
+		cpu_input_boost_kick_max(50);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+	}
+
 	/* Boost CPU to the max for 1250 ms when userspace launches an app */
 	/*
 	 * Determine whether and which event to report to ptracer.  When
@@ -2031,9 +2036,15 @@ long _do_fork(unsigned long clone_flags,
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
 	 */
+
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 		struct pid *pid;
+
+		if (task_is_zygote(p)) {
+			cluster_input_boost_kick_max(1000, p->cpu);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+		}
 
 		trace_sched_process_fork(current, p);
 

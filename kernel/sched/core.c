@@ -77,8 +77,6 @@
 #include <linux/prefetch.h>
 #include <linux/irq.h>
 #include <linux/cpufreq_times.h>
-#include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
 #include <linux/mutex.h>
 
 #include <asm/switch_to.h>
@@ -2763,6 +2761,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	 *
 	 * Silence PROVE_RCU.
 	 */
+
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
 	/*
 	 * We're setting the cpu for the first time, we don't migrate,
@@ -2791,10 +2790,6 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 #endif
 
 	put_cpu();
-	if (is_zygote_pid(p->pid)) {
-		cluster_input_boost_kick_max(1250, cpu);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1250);
-	}
 	return 0;
 }
 
