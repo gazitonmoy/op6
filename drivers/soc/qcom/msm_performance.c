@@ -44,7 +44,7 @@ static struct events events_group;
 static struct task_struct *events_notify_thread;
 
 /**************************sysfs start********************************/
-static int set_touchboost(const char *buf, const struct kernel_param *kp)
+/*static int set_touchboost(const char *buf, const struct kernel_param *kp)
 {
 	int val;
 	if (sscanf(buf, "%d\n", &val) != 1)
@@ -61,7 +61,7 @@ static const struct kernel_param_ops param_ops_touchboost = {
 	.set = set_touchboost,
 	.get = get_touchboost,
 };
-device_param_cb(touchboost, &param_ops_touchboost, NULL, 0644);
+device_param_cb(touchboost, &param_ops_touchboost, NULL, 0644);*/
 
 /*
  * Userspace sends cpu#:min_freq_value to vote for min_freq_value as the new
@@ -79,7 +79,8 @@ static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 	const char *reset = "0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0";
 
 	if (touchboost == 0)
-		cp = reset;
+		return 0;
+		//cp = reset;
 
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
@@ -170,7 +171,8 @@ static int set_cpu_max_freq(const char *buf, const struct kernel_param *kp)
 	const char *reset = "0:4294967295 1:4294967295 2:4294967295 3:4294967295 4:4294967295 5:4294967295 6:4294967295 7:4294967295";
 
 	if (touchboost == 0)
-		cp = reset;
+		return 0;
+		//cp = reset;
 
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
