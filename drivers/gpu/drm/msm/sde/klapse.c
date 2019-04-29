@@ -1036,7 +1036,7 @@ static int __init klapse_init(void)
 static void __exit klapse_exit(void){
     printk(KERN_INFO "KLapse exit entered!!!.\n");
     kobject_del(klapse_kobj);
-    del_timer(&pulse_timer);
+    del_timer_sync(&pulse_timer);
     printk(KERN_INFO "KLapse exit finished!!!.\n");
 }
 
