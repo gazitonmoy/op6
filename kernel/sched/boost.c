@@ -23,6 +23,7 @@
  */
 
 unsigned int sysctl_sched_boost;
+unsigned int sysctl_sched_boost_kill;
 static enum sched_boost_policy boost_policy;
 static enum sched_boost_policy boost_policy_dt = SCHED_BOOST_NONE;
 static DEFINE_MUTEX(boost_mutex);
@@ -215,7 +216,7 @@ int sched_boost_handler(struct ctl_table *table, int write,
 		goto done;
 
 	if (verify_boost_params(old_val, *data)) {
-		_sched_set_boost(old_val, *data);
+		//_sched_set_boost(old_val, *data);
 	} else {
 		/*
 		 * Only return error when switching from one boost type
