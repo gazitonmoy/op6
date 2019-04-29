@@ -10,7 +10,7 @@ void cpu_input_boost_kick(void);
 void cpu_input_boost_kick_max(unsigned int duration_ms);
 void cluster_input_boost_kick_max(unsigned int duration_ms, int cpu);
 void cpu_input_boost_kick_flex(void);
-void cpu_input_boost_kick_wake(void);
+void cpu_input_boost_kick_wake(unsigned int duration_ms);
 #else
 static inline void cpu_input_boost_kick(void)
 {
@@ -21,7 +21,7 @@ static inline void cpu_input_boost_kick_max(unsigned int duration_ms)
 void core_input_boost_kick_max(unsigned int duration_ms, unsigned int cpu)
 {
 }
-static inline void cpu_input_boost_kick_wake(void)
+static inline void cpu_input_boost_kick_wake(unsigned int duration_ms)
 {
 }
 static inline void cpu_input_boost_kick_flex(void)
