@@ -514,14 +514,6 @@ config REMOVE_INPUT_BOOST_FREQ_PERF
 	  of using a higher than cpuinfo.min_freq (e.g. OnePlus 5/5T/6)
 	  this frequency will be used.
 
-config  MAX_BOOST_FREQ_LP
-	int "Low-power cluster max frequency"
-	default "1766400"
-
-config  MAX_BOOST_FREQ_PERF
-	int "Performance cluster cluster max frequency"
-	default "2803200"
-
 config FLEX_BOOST_FREQ_LP
 	int "Low-power cluster general boost freq"
 	default "0"
@@ -564,13 +556,6 @@ config MAX_BOOST_STUNE_OFFSET
 	  accepted for testing purposes. A value of 0 disables SchedTune
 	  boosting for this level.
 
-config STUNE_BOOST_EXTENDER_MS
-	int "Foreground app schedtune max extend duration"
-	depends on DYNAMIC_STUNE_BOOST
-	default '1500'
-	help
-	  Extends the stune boost duration to a given timespan
-
 config  GPU_BOOST_FREQ
 	int "Boost GPU to given frequency"
 	depends on DYNAMIC_STUNE_BOOST
@@ -585,13 +570,6 @@ config  GPU_MIN_FREQ
 	help
 	  MIN GPU frequency
 
-config GPU_BOOST_EXTENDER_MS
-	int "Boost GPU for 3000 ms"
-	depends on DYNAMIC_STUNE_BOOST
-	default '3000'
-	help
-	  Boosts GPU to given frequency for 3000 ms
-
 config SUSPEND_STUNE_BOOST
 	int "Suspend SchedTune boost value"
 	depends on DYNAMIC_STUNE_BOOST
@@ -605,6 +583,18 @@ config INPUT_THREAD_PRIORITY
 	int "Input hread priority"
 	depends on DYNAMIC_STUNE_BOOST
 	default "25"
+
+config MAX_BOOST_FREQ_LP
+	int "Low-power cluster max-boost freq"
+	default "1766400"
+	help
+	  Max-boost frequency for the low-power CPU cluster.
+
+ config MAX_BOOST_FREQ_PERF
+	int "Performance cluster max-boost freq"
+	default "2803200"
+	help
+	  Max-boost frequency for the performance CPU cluster.
 
 endif
 
