@@ -111,8 +111,9 @@ static unsigned long do_lmk_reclaim(unsigned long pages_needed)
 	unsigned long pages_freed = 0;
 	int i;
 
-	cpu_input_boost_kick_max(BOOST_DURATION_MS);
-	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, BOOST_DURATION_MS);
+	cpu_input_boost_kick_cluster1(500);
+	cpu_input_boost_kick_cluster2(500);
+	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
 
 	for (i = 1; i < ARRAY_SIZE(adj_prio); i++) {
 		pages_freed += scan_and_kill(adj_prio[i], adj_prio[i - 1],

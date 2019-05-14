@@ -348,8 +348,9 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 		__pm_wakeup_event(&fpc1020->ttw_wl, FPC_TTW_HOLD_TIME);
 	}
 
-	cpu_input_boost_kick_wake(1200);
-	devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW, 1200);
+	cpu_input_boost_kick_cluster1_wake(1000);
+	cpu_input_boost_kick_cluster2_wake(1000);
+	devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW, 1000);
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 

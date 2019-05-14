@@ -436,7 +436,8 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 
 	switch (csl_packet->header.op_code & 0xFFFFFF) {
 	case CAM_ACTUATOR_PACKET_OPCODE_INIT:
-		cpu_input_boost_kick_max(1000);
+		cpu_input_boost_kick_cluster1(1000);
+		cpu_input_boost_kick_cluster2(1000);
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
 
 		offset = (uint32_t *)&csl_packet->payload;

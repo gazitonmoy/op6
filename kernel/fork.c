@@ -2004,11 +2004,13 @@ long _do_fork(unsigned long clone_flags,
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
-
+/*
+#ifdef CONFIG_CPU_INPUT_BOOST
 	if (task_is_zygote(current)) {
-		cpu_input_boost_kick_max(50);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+		cpu_input_boost_kick_max(150);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
 	}
+#endif*/
 
 	/* Boost CPU to the max for 1250 ms when userspace launches an app */
 	/*
@@ -2041,11 +2043,6 @@ long _do_fork(unsigned long clone_flags,
 		struct completion vfork;
 		struct pid *pid;
 
-		if (task_is_zygote(p)) {
-			cluster_input_boost_kick_max(1000, p->cpu);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
-		}
-
 		trace_sched_process_fork(current, p);
 
 		if (!(clone_flags & CLONE_VM))
@@ -2062,7 +2059,15 @@ long _do_fork(unsigned long clone_flags,
 			init_completion(&vfork);
 			get_task_struct(p);
 		}
-
+#ifdef CONFIG_CPU_INPUT_BOOST
+		if (task_is_zygote(p)) {
+			if (p->cpu < 4)
+				cpu_input_boost_kick_cluster1(1000);
+			if (p->cpu > 3)
+				cpu_input_boost_kick_cluster2(1000);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+		}
+#endif
 		wake_up_new_task(p);
 
 		/* forking complete and child started to run, tell ptracer */

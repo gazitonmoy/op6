@@ -2965,11 +2965,13 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* This covers boosting for app launches and app transitions */
-	if (!ret && !threadgroup &&
-	    !strcmp(of->kn->parent->name, "top-app") &&
+	if (!ret && !threadgroup && !strcmp(of->kn->parent->name, "top-app") &&
 	    task_is_zygote(tsk->parent)) {
-		cluster_input_boost_kick_max(1000, tsk->cpu);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+		if (tsk->cpu < 4)
+			cpu_input_boost_kick_cluster1(1250);
+		else
+			cpu_input_boost_kick_cluster2(1250);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1250);
 	}
 
 	put_task_struct(tsk);
