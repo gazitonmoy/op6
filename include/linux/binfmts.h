@@ -132,7 +132,5 @@ static inline bool tsk_is_booster(struct task_struct *tsk)
 	return !strcmp(comm, "init") || !strcmp(comm, "NodeLooperThrea") ||
 	       !strcmp(comm, "power@1.3-servi");
 }
-extern bool comm_should_block_write(char *comm);
-
 
 #endif /* _LINUX_BINFMTS_H */
