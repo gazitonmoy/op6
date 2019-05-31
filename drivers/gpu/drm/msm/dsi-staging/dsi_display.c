@@ -4575,7 +4575,7 @@ static ssize_t sysfs_dynamic_dsi_clk_write(struct device *dev,
 
 	pr_info("%s: bitrate param value: '%d'\n", __func__, clk_rate);
 
-	mutex_lock(&display->display_lock);
+	mutex_lock(&dsi_display_clk_mutex);
 
 	mutex_lock(&dsi_display_clk_mutex);
 	display->cached_clk_rate = clk_rate;
