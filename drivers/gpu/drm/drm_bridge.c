@@ -24,6 +24,8 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/cpu_input_boost.h>
+#include <linux/devfreq_boost.h>
 
 #include <drm/drm_bridge.h>
 #include <drm/drmP.h>
@@ -363,7 +365,9 @@ void drm_bridge_enable_all(struct drm_device *dev)
 {
 	if (atomic_cmpxchg(&dev->bridges_enabled, 0, 1))
 		return;
-
+	cpu_input_boost_kick_cluster1_wake(500);
+	cpu_input_boost_kick_cluster2_wake(500);
+	devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW, 500);
 	kthread_queue_work(&dev->bridge_enable_worker,
 			   &dev->bridge_enable_work);
 }
