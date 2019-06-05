@@ -2004,15 +2004,14 @@ long _do_fork(unsigned long clone_flags,
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
-/*
+
 #ifdef CONFIG_CPU_INPUT_BOOST
 	if (task_is_zygote(current)) {
-		cpu_input_boost_kick_max(150);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 150);
+		cpu_input_boost_kick_cluster1(75);
+		cpu_input_boost_kick_cluster2(75);
+		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 75);
 	}
-#endif*/
-
-	/* Boost CPU to the max for 1250 ms when userspace launches an app */
+#endif	
 	/*
 	 * Determine whether and which event to report to ptracer.  When
 	 * called from kernel_thread or CLONE_UNTRACED is explicitly
