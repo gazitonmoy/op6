@@ -365,7 +365,7 @@ void update_vsyscall(struct timekeeper *tk)
 	WRITE_ONCE(vdso_data->hrtimer_res, hrtimer_resolution);
 
 	if (!use_syscall) {
-#endif
+
 		struct timespec btm = ktime_to_timespec(tk->offs_boot);
 
 		/* tkr_mono.cycle_last == tkr_raw.cycle_last */
