@@ -117,6 +117,7 @@ static int dt2w_switch = 0;
 #define TYPE_B_PROTOCOL      //Multi-finger operation
 #define TP_FW_NAME_MAX_LEN 128
 #define SUPPORT_TP_TOUCHKEY
+#define PM_QOS_VALUE_TP 400
 
 #define TEST_MAGIC1 0x494D494C
 #define TEST_MAGIC2 0x474D4954
@@ -6084,7 +6085,7 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 #endif
 
 	pm_qos_add_request(&ts->pm_qos_req_dma, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
+		PM_QOS_VALUE_TP);
 
 	if (ts->l2pc_cpus_mask) {
 
@@ -6099,7 +6100,7 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 
 		pm_qos_add_request(&ts->l2pc_cpus_qos,
 				PM_QOS_CPU_DMA_LATENCY,
-				PM_QOS_DEFAULT_VALUE);
+				PM_QOS_VALUE_TP);
 	}
 
 	ts->client = client;
