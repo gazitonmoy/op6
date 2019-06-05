@@ -267,13 +267,14 @@ static struct attribute_group events_attr_group = {
 static int perf_adjust_notify(struct notifier_block *nb, unsigned long val,
 							void *data)
 {
-	struct cpufreq_policy *policy = data;
-	unsigned int cpu = policy->cpu;
-	struct cpu_status *cpu_st = &per_cpu(cpu_stats, cpu);
-	unsigned int min = cpu_st->min, max = cpu_st->max;
+	//struct cpufreq_policy *policy = data;
+	//unsigned int cpu = policy->cpu;
+	//struct cpu_status *cpu_st = &per_cpu(cpu_stats, cpu);
+	//unsigned int min = cpu_st->min, max = cpu_st->max;
 
+	return NOTIFY_OK;
 
-	if (val != CPUFREQ_ADJUST)
+	/*if (val != CPUFREQ_ADJUST)
 		return NOTIFY_OK;
 
 	pr_debug("msm_perf: CPU%u policy before: %u:%u kHz\n", cpu,
@@ -285,7 +286,7 @@ static int perf_adjust_notify(struct notifier_block *nb, unsigned long val,
 	pr_debug("msm_perf: CPU%u policy after: %u:%u kHz\n", cpu,
 						policy->min, policy->max);
 
-	return NOTIFY_OK;
+	return NOTIFY_OK;*/
 }
 
 static struct notifier_block perf_cpufreq_nb = {
