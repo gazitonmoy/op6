@@ -596,6 +596,27 @@ config MAX_BOOST_FREQ_LP
 	help
 	  Max-boost frequency for the performance CPU cluster.
 
+config STUNE_BOOST_EXTENDER_MS
+	int "Foreground app schedtune max extend duration"
+	depends on DYNAMIC_STUNE_BOOST
+	default '2500'
+	help
+	  Extends the stune boost duration to a given timespan
+
+config MAX_STUNE_BOOST_EXTENDER_MS
+	int "Foreground app schedtune max extend duration"
+	depends on DYNAMIC_STUNE_BOOST
+	default '500'
+	help
+	  Extends the stune boost duration to a given timespan
+
+config GPU_BOOST_EXTENDER_MS
+	int "Boost GPU for 3000 ms"
+	depends on DYNAMIC_STUNE_BOOST
+	default '3000'
+	help
+	  Boosts GPU to given frequency for 3000 ms
+
 endif
 
 comment "CPU frequency scaling drivers"
