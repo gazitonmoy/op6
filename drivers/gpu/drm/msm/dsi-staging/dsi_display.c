@@ -4577,7 +4577,6 @@ static ssize_t sysfs_dynamic_dsi_clk_write(struct device *dev,
 
 	mutex_lock(&dsi_display_clk_mutex);
 
-	mutex_lock(&dsi_display_clk_mutex);
 	display->cached_clk_rate = clk_rate;
 	rc = dsi_display_request_update_dsi_bitrate(display, clk_rate);
 	if (!rc) {
@@ -4590,7 +4589,6 @@ static ssize_t sysfs_dynamic_dsi_clk_write(struct device *dev,
 		atomic_set(&display->clkrate_change_pending, 0);
 		display->cached_clk_rate = 0;
 
-		mutex_unlock(&dsi_display_clk_mutex);
 		mutex_unlock(&display->display_lock);
 
 		return rc;
@@ -4598,7 +4596,6 @@ static ssize_t sysfs_dynamic_dsi_clk_write(struct device *dev,
 	atomic_set(&display->clkrate_change_pending, 1);
 
 	mutex_unlock(&dsi_display_clk_mutex);
-	mutex_unlock(&display->display_lock);
 
 	return count;
 
