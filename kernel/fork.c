@@ -2006,10 +2006,12 @@ long _do_fork(unsigned long clone_flags,
 	long nr;
 
 #ifdef CONFIG_CPU_INPUT_BOOST
-	if (task_is_zygote(current)) {
-		cpu_input_boost_kick_cluster1(75);
-		cpu_input_boost_kick_cluster2(75);
-		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 75);
+	if (current)  {
+		if (task_is_zygote(current)) {
+			cpu_input_boost_kick_cluster1(75);
+			cpu_input_boost_kick_cluster2(75);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 75);
+		}
 	}
 #endif	
 	/*
@@ -2059,12 +2061,14 @@ long _do_fork(unsigned long clone_flags,
 			get_task_struct(p);
 		}
 #ifdef CONFIG_CPU_INPUT_BOOST
-		if (task_is_zygote(p)) {
-			if (p->cpu < 4)
-				cpu_input_boost_kick_cluster1(1000);
-			if (p->cpu > 3)
-				cpu_input_boost_kick_cluster2(1000);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+		if (p) {
+			if (task_is_zygote(p)) {
+				if (p->cpu < 4)
+					cpu_input_boost_kick_cluster1(1000);
+				if (p->cpu > 3)
+					cpu_input_boost_kick_cluster2(1000);
+				devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+			}
 		}
 #endif
 		wake_up_new_task(p);
