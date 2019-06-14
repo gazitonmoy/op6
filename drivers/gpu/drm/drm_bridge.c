@@ -367,7 +367,6 @@ void drm_bridge_enable_all(struct drm_device *dev)
 		return;
 	cpu_input_boost_kick_cluster1_wake(500);
 	cpu_input_boost_kick_cluster2_wake(500);
-	devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW, 500);
 	kthread_queue_work(&dev->bridge_enable_worker,
 			   &dev->bridge_enable_work);
 }
