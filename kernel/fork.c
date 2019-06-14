@@ -2008,9 +2008,9 @@ long _do_fork(unsigned long clone_flags,
 #ifdef CONFIG_CPU_INPUT_BOOST
 	if (current)  {
 		if (task_is_zygote(current)) {
-			cpu_input_boost_kick_cluster1(75);
-			cpu_input_boost_kick_cluster2(75);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 75);
+			cpu_input_boost_kick_cluster1(750);
+			cpu_input_boost_kick_cluster2(750);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 750);
 		}
 	}
 #endif	
@@ -2060,7 +2060,7 @@ long _do_fork(unsigned long clone_flags,
 			init_completion(&vfork);
 			get_task_struct(p);
 		}
-#ifdef CONFIG_CPU_INPUT_BOOST
+#/*ifdef CONFIG_CPU_INPUT_BOOST
 		if (p) {
 			if (task_is_zygote(p)) {
 				if (p->cpu < 4)
@@ -2070,7 +2070,7 @@ long _do_fork(unsigned long clone_flags,
 				devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
 			}
 		}
-#endif
+#endif*/
 		wake_up_new_task(p);
 
 		/* forking complete and child started to run, tell ptracer */
