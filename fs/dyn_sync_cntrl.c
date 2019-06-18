@@ -126,9 +126,10 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 
 	blank = *(int *)(evdata->data);	
 
-	if (((blank == MSM_DRM_BLANK_POWERDOWN)
-		&& (event == MSM_DRM_EARLY_EVENT_BLANK))
-		|| (blank == MSM_DRM_BLANK_NORMAL)) {
+	if (event != MSM_DRM_EARLY_EVENT_BLANK)
+		return 0;
+
+	if (blank == MSM_DRM_BLANK_POWERDOWN_CUST) {
 		mutex_lock(&fsync_mutex);
 		suspend_active = false;
 
@@ -138,10 +139,8 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 		}
 		
 		mutex_unlock(&fsync_mutex);
-	}
-			
-	if ((blank == MSM_DRM_BLANK_UNBLANK_CUST)
-		&& (event == MSM_DRM_EARLY_EVENT_BLANK)) {
+	} else if (blank == MSM_DRM_BLANK_UNBLANK_CUST) {
+		pr_info("Screen off, dynamic fsync off\n");
 		mutex_lock(&fsync_mutex);
 		suspend_active = true;
 		mutex_unlock(&fsync_mutex);
