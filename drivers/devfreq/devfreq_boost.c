@@ -220,13 +220,13 @@ static void devfreq_update_boosts(struct boost_dev *b, unsigned long state)
 {
 	struct devfreq *df = b->df;
 
-	if (!test_bit(SCREEN_ON, &state)) {
+	if (unlikely (READ_ONCE(b->df) && !test_bit(SCREEN_ON, &state))) {
 		mutex_lock(&df->lock);
-		df->max_boost = false;
 		df->min_freq = df->profile->freq_table[0];
+		df->min_freq = test_bit(WAKE_BOOST, &state);
 		update_devfreq(df);
 		mutex_unlock(&df->lock);
-	} else {
+	} else if (READ_ONCE(b->df)) {
 		mutex_lock(&df->lock);
 		df->min_freq = test_bit(FLEX_BOOST, &state) ?
 			       devfreq_boost_freq_low :
@@ -287,13 +287,16 @@ static int msm_drm_notifier_cb(struct notifier_block *nb, unsigned long action,
 		struct boost_dev *b = d->devices + i;
 
 		if (*blank == MSM_DRM_BLANK_UNBLANK_CUST) {
+			devfreq_boost_kick_wake(DEVFREQ_MSM_CPUBW, 1000);
 			set_bit(SCREEN_ON, &b->state);
-		} else {
+			set_bit(SCREEN_ON, &b->state);
+		} else if (*blank == MSM_DRM_BLANK_POWERDOWN_CUST) {
 			clear_bit(SCREEN_ON, &b->state);
 			clear_bit(WAKE_BOOST, &b->state);
 			clear_bit(MAX_BOOST, &b->state);
 			clear_bit(FLEX_BOOST, &b->state);
 			clear_bit(INPUT_BOOST, &b->state);
+			pr_info("Screen off, boosts turned off\n");
 			wake_up(&b->boost_waitq);
 		}
 	}
