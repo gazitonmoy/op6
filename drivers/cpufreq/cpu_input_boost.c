@@ -639,10 +639,10 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 
 	/* Boost when the screen turns on and unboost when it turns off */
 	if (*blank == MSM_DRM_BLANK_UNBLANK_CUST) {	
-		cpu_input_boost_kick_cluster1_wake(500);
-		cpu_input_boost_kick_cluster2_wake(500);	
+		cpu_input_boost_kick_cluster1_wake(1000);
+		cpu_input_boost_kick_cluster2_wake(1000);	
 		set_bit(SCREEN_ON, &b->state);
-	} else {
+	} else if (*blank == MSM_DRM_BLANK_POWERDOWN_CUST) {
 		clear_bit(SCREEN_ON, &b->state);
 		clear_bit(INPUT_BOOST, &b->state);
 		clear_bit(FLEX_BOOST, &b->state);
@@ -653,6 +653,7 @@ static int msm_drm_notifier_cb(struct notifier_block *nb,
 		clear_bit(INPUT_STUNE_BOOST, &b->state);
 		clear_bit(MAX_STUNE_BOOST, &b->state);
 		clear_bit(FLEX_STUNE_BOOST, &b->state);
+		pr_info("Screen off, boosts turned off\n");
 		wake_up(&b->boost_waitq);
 	}
 	return NOTIFY_OK;
