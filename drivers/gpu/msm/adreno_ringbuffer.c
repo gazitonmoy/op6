@@ -12,6 +12,7 @@
  */
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/sched/clock.h>
 #include <linux/log2.h>
 #include <linux/time.h>
 #include <linux/delay.h>
@@ -108,16 +109,26 @@ static void adreno_ringbuffer_wptr(struct adreno_device *adreno_dev,
 			ret = adreno_gmu_fenced_write(adreno_dev,
 				ADRENO_REG_CP_RB_WPTR, rb->_wptr,
 				FENCE_STATUS_WRITEDROPPED0_MASK);
-
+			rb->skip_inline_wptr = false;
 		}
+	} else {
+		/*
+		 * We skipped inline submission because of preemption state
+		 * machine. Set things up so that we write the wptr to the
+		 * hardware eventually.
+		 */
+		if (adreno_dev->cur_rb == rb)
+			rb->skip_inline_wptr = true;
 	}
 
 	rb->wptr = rb->_wptr;
 	spin_unlock_irqrestore(&rb->preempt_lock, flags);
 
-	if (ret)
-		kgsl_device_snapshot(KGSL_DEVICE(adreno_dev), NULL, false);
-
+	if (ret) {
+		/* If WPTR update fails, set the fault and trigger recovery */
+		adreno_set_gpu_fault(adreno_dev, ADRENO_GMU_FAULT);
+		adreno_dispatcher_schedule(KGSL_DEVICE(adreno_dev));
+	}
 }
 
 static void adreno_profile_submit_time(struct adreno_submit_time *time)
@@ -249,8 +260,6 @@ int adreno_ringbuffer_start(struct adreno_device *adreno_dev,
 		rb->wptr = 0;
 		rb->_wptr = 0;
 		rb->wptr_preempt_end = 0xFFFFFFFF;
-		rb->starve_timer_state =
-			ADRENO_DISPATCHER_RB_STARVE_TIMER_UNINIT;
 	}
 
 	/* start is specific GPU rb */
@@ -762,8 +771,6 @@ adreno_ringbuffer_issue_internal_cmds(struct adreno_ringbuffer *rb,
 		sizedwords, 0, NULL);
 }
 
-
-
 static void adreno_ringbuffer_set_constraint(struct kgsl_device *device,
 			struct kgsl_drawobj *drawobj)
 {
@@ -781,33 +788,43 @@ static void adreno_ringbuffer_set_constraint(struct kgsl_device *device,
 						context->id);
 
 	if (context->l3_pwr_constraint.type &&
-			((context->flags & KGSL_CONTEXT_PWR_CONSTRAINT) ||
-				(flags & KGSL_CONTEXT_PWR_CONSTRAINT))) {
+		((context->flags & KGSL_CONTEXT_PWR_CONSTRAINT) ||
+			(flags & KGSL_CONTEXT_PWR_CONSTRAINT))) {
 
-		if (IS_ERR_OR_NULL(device->l3_clk)) {
-			KGSL_DEV_ERR_ONCE(device, "Cannot set L3 constraint\n");
+		if (!device->l3_clk) {
+			KGSL_DEV_ERR_ONCE(device,
+				"l3_vote clk not available\n");
 			return;
 		}
 
 		switch (context->l3_pwr_constraint.type) {
-
 		case KGSL_CONSTRAINT_L3_PWRLEVEL: {
 			unsigned int sub_type;
+			unsigned int new_l3;
+			int ret = 0;
 
 			sub_type = context->l3_pwr_constraint.sub_type;
 
-			if (sub_type == KGSL_CONSTRAINT_L3_PWR_MED)
-				clk_set_rate(device->l3_clk,
-						device->l3_freq[1]);
+			/*
+			 * If an L3 constraint is already set, set the new
+			 * one only if it is higher.
+			 */
+			new_l3 = max_t(unsigned int, sub_type + 1,
+					device->cur_l3_pwrlevel);
+			new_l3 = min_t(unsigned int, new_l3,
+					device->num_l3_pwrlevels - 1);
 
-			if (sub_type == KGSL_CONSTRAINT_L3_PWR_MAX)
-				clk_set_rate(device->l3_clk,
-						device->l3_freq[2]);
+			ret = clk_set_rate(device->l3_clk,
+					device->l3_freq[new_l3]);
+
+			if (!ret)
+				device->cur_l3_pwrlevel = new_l3;
+			else
+				KGSL_DRV_ERR_RATELIMIT(device,
+					"Could not set l3_vote: %d\n",
+					ret);
+			break;
 			}
-			break;
-		case KGSL_CONSTRAINT_L3_NONE:
-			clk_set_rate(device->l3_clk, device->l3_freq[0]);
-			break;
 		}
 	}
 }
