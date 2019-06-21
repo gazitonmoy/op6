@@ -404,9 +404,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 # Optimization for sdm845
 KBUILD_CFLAGS	+= -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common -fshort-wchar -std=gnu89 $(call cc-option,-fno-PIE) \
-		   -mcpu=cortex-a75.cortex-a55+crypto -mtune=cortex-a75.cortex-a55 -fdiagnostics-color=always \
-		   -Wno-attribute-alias -fno-common -fshort-wchar  -floop-nest-optimize -fgraphite-identity \
-		   -ftree-loop-distribution -floop-parallelize-all -floop-interchange -floop-block -floop-strip-mine -ffast-math -fgcse-sm -fipa-pta \
+		   -mcpu=cortex-a76.cortex-a55+crypto -mtune=cortex-a76.cortex-a55 -fdiagnostics-color=always \
+		   -Wno-attribute-alias -fno-common -fshort-wchar -ffast-math -fgcse-sm -fipa-pta \
 		   -fgcse-las -fbranch-target-load-optimize -fno-asynchronous-unwind-tables\
 		   -flive-range-shrinkage -fvariable-expansion-in-unroller -funsafe-math-optimizations
 
@@ -769,13 +768,13 @@ export DISABLE_CFI
 endif
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= $-Ofast $(call cc-disable-warning,maybe-uninitialized, -Os)
+KBUILD_CFLAGS	+= $-O3 $(call cc-disable-warning,maybe-uninitialized, -Os)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized,)
 else
 ifdef CONFIG_PROFILE_ALL_BRANCHES
-KBUILD_CFLAGS	+= -Ofast $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= -O3 $(call cc-disable-warning,maybe-uninitialized,)
 else
-KBUILD_CFLAGS   += -Ofast $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS   += -O3 $(call cc-disable-warning,maybe-uninitialized,)
 endif
 endif
 
