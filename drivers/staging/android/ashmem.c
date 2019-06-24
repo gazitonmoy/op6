@@ -382,31 +382,16 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 	if (unlikely(!size))
 		return -EINVAL;
 
-	/* requested mapping size larger than object size */
-	if (vma->vm_end - vma->vm_start > PAGE_ALIGN(size)) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	/* requested protection bits must match our allowed protection mask */
-	if (unlikely((vma->vm_flags & ~calc_vm_prot_bits(asma->prot_mask, 0)) &
-		     calc_vm_prot_bits(PROT_MASK, 0))) {
-		ret = -EPERM;
-		goto out;
-	}
-	vma->vm_flags &= ~calc_vm_may_flags(~asma->prot_mask);
-
-	if (!asma->file) {
-		char *name = ASHMEM_NAME_DEF;
-		struct file *vmfile;
+	if (vma->vm_end - vma->vm_start > PAGE_ALIGN(size))
+		return -EINVAL;
 
 	prot_mask = READ_ONCE(asma->prot_mask);
 
 	/* requested protection bits must match our allowed protection mask */
-	if (unlikely((vma->vm_flags & ~calc_vm_prot_bits(prot_mask)) &
-		     calc_vm_prot_bits(PROT_MASK)))
-		return -EPERM;
-	vma->vm_flags &= ~calc_vm_may_flags(~prot_mask);
+	if (unlikely((vma->vm_flags & ~calc_vm_prot_bits(asma->prot_mask, 0)) &
+		     calc_vm_prot_bits(PROT_MASK, 0))) 
+		ret = -EPERM;
+	vma->vm_flags &= ~calc_vm_may_flags(~asma->prot_mask);
 
 	if (!READ_ONCE(asma->file)) {
 		bool do_setup;
