@@ -129,7 +129,6 @@ int devfreq_add_devbw(struct device *dev)
 	u32 *data, ports[MAX_PATHS * 2];
 	const char *gov_name;
 	int ret, len, i, num_paths;
-
 	d = devm_kzalloc(dev, sizeof(*d), GFP_KERNEL);
 	if (!d)
 		return -ENOMEM;
@@ -212,8 +211,10 @@ int devfreq_add_devbw(struct device *dev)
 		return PTR_ERR(d->df);
 	}
 
-	if (!strcmp(dev_name(dev), "soc:qcom,cpubw"))
+	if (!strcmp(dev_name(dev), "soc:qcom,cpubw")) {
 		devfreq_register_boost_device(DEVFREQ_MSM_CPUBW, d->df);
+		pr_info("Added devfreq boost device %s\n",dev_name(dev));
+	}
 
 	return 0;
 }
