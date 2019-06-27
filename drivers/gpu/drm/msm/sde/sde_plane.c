@@ -4446,6 +4446,8 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 			psde->pipe_sblk->maxvdeciexp);
 	sde_kms_info_add_keyint(info, "max_per_pipe_bw",
 			psde->pipe_sblk->max_per_pipe_bw * 1000LL);
+	sde_kms_info_add_keyint(info, "max_per_pipe_bw_high",
+			psde->pipe_sblk->max_per_pipe_bw_high * 1000LL);
 	if (psde->features & BIT(SDE_SSPP_BLOCK_SEC_UI))
 		sde_kms_info_add_keyint(info, "block_sec_ui", 1);
 	msm_property_set_blob(&psde->property_info, &psde->blob_info,
