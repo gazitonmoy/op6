@@ -201,8 +201,8 @@ static int _sde_fence_create_fd(void *fence_ctx, uint32_t val)
 #ifdef CONFIG_DRM_SYNC_DEBUG
 	snprintf(sde_fence->name, SDE_FENCE_NAME_SIZE, "sde_fence:%s:%u",
 						sde_fence->ctx->name, val);
-	fence_init(&sde_fence->base, &sde_fence_ops, &ctx->lock,
 #endif
+	fence_init(&sde_fence->base, &sde_fence_ops, &ctx->lock,
 		ctx->context, val);
 
 	/* create fd */
