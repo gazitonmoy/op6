@@ -1001,7 +1001,7 @@ struct sg_table *ion_create_chunked_sg_table(phys_addr_t buffer_base,
 	n_chunks = DIV_ROUND_UP(total_size, chunk_size);
 	pr_debug("creating sg_table with %d chunks\n", n_chunks);
 
-	ret = ion_sg_alloc_table(table, n_chunks, GFP_KERNEL);
+	ret = sg_alloc_table(table, table->nents, GFP_KERNEL);
 	if (ret)
 		goto err0;
 
