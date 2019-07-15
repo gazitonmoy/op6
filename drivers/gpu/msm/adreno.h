@@ -1107,9 +1107,6 @@ static inline void adreno_snapshot(struct kgsl_device *device,
 		struct kgsl_snapshot *snapshot,
 		struct kgsl_context *context) {}
 
-void adreno_snapshot_gmu(struct kgsl_device *device,
-		struct kgsl_snapshot *snapshot);
-
 int adreno_reset(struct kgsl_device *device, int fault);
 
 void adreno_fault_skipcmd_detached(struct adreno_device *adreno_dev,

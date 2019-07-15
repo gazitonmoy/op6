@@ -3563,13 +3563,11 @@ static const struct kgsl_functable adreno_functable = {
 	.compat_ioctl = adreno_compat_ioctl,
 	.power_stats = adreno_power_stats,
 	.gpuid = adreno_gpuid,
-	.snapshot = adreno_snapshot,
 	.irq_handler = adreno_irq_handler,
 	.drain = adreno_drain,
 	.device_private_create = adreno_device_private_create,
 	.device_private_destroy = adreno_device_private_destroy,
 	/* Optional functions */
-	.snapshot_gmu = adreno_snapshot_gmu,
 	.drawctxt_create = adreno_drawctxt_create,
 	.drawctxt_detach = adreno_drawctxt_detach,
 	.drawctxt_destroy = adreno_drawctxt_destroy,
