@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2015-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2019 Sultan Alsawaf <sultan@kerneltoast.com>.
+ * Copyright (C) 2019 smd845 changes pappschlumpf <pappschlumpf@googlemail.com sm8150 changes
  */
 
 #include <linux/dma-buf.h>
@@ -10,22 +11,24 @@
 #include <linux/slab.h>
 #include <asm/barrier.h>
 
+struct msm_iommu_map {
+	struct device *dev;
+	struct msm_iommu_meta *meta;
+	struct list_head lnode;
+	struct scatterlist *sgl;
+	enum dma_data_direction dir;
+	unsigned int nents;
+	atomic_t refcount;
+	unsigned long attrs;
+	dma_addr_t buf_start_addr;
+};
+
 struct msm_iommu_meta {
 	struct rb_node node;
 	struct list_head maps;
 	atomic_t refcount;
 	rwlock_t lock;
 	void *buffer;
-};
-
-struct msm_iommu_map {
-	struct device *dev;
-	struct msm_iommu_meta *meta;
-	struct list_head lnode;
-	struct scatterlist sgl;
-	enum dma_data_direction dir;
-	unsigned int nents;
-	atomic_t refcount;
 };
 
 static struct rb_root iommu_root;
@@ -191,13 +194,17 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 		}
 
 		ret = dma_map_sg_attrs(dev, sg, nents, dir, attrs);
-		if (ret != nents) {
+		if (!ret) {
 			kfree(map);
 			goto release_meta;
 		}
 
 		*map = (typeof(*map)){
+			.nents = nents,
 			.dev = dev,
+			.dir = dir,
+			.attrs = attrs,
+			.buf_start_addr = sg_phys(sg),
 			.meta = meta,
 			.lnode = LIST_HEAD_INIT(map->lnode),
 			.refcount = ATOMIC_INIT(1 + !!late_unmap),
@@ -235,6 +242,7 @@ void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
 		return;
 	}
 
+	map->attrs = attrs;
 	map->dir = dir;
 	free_map = atomic_dec_and_test(&map->refcount);
 	if (free_map)
@@ -242,7 +250,7 @@ void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
 	write_unlock(&meta->lock);
 
 	if (free_map) {
-		dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
+		dma_unmap_sg_attrs(map->dev, map->sgl, map->nents, map->dir, map->attrs);
 		kfree(map);
 	}
 
@@ -279,7 +287,7 @@ int msm_dma_unmap_all_for_dev(struct device *dev)
 	read_unlock(&rb_tree_lock);
 
 	list_for_each_entry_safe(map, map_next, &unmap_list, lnode) {
-		dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
+		dma_unmap_sg(map->dev, map->sgl, map->nents, map->dir);
 		kfree(map);
 	}
 
@@ -308,7 +316,7 @@ void msm_dma_buf_freed(void *buffer)
 	write_unlock(&meta->lock);
 
 	list_for_each_entry_safe(map, map_next, &unmap_list, lnode) {
-		dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
+		dma_unmap_sg(map->dev, map->sgl, map->nents, map->dir);
 		kfree(map);
 	}
 
