@@ -2010,7 +2010,7 @@ long _do_fork(unsigned long clone_flags,
 		if (task_is_zygote(current)) {
 			cpu_input_boost_kick_cluster1(750);
 			cpu_input_boost_kick_cluster2(750);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 750);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
 		}
 	}
 #endif	
