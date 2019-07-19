@@ -2982,7 +2982,7 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 				cpu_input_boost_kick_cluster1(1250);
 			else
 				cpu_input_boost_kick_cluster2(1250);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1250);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
 		}
 	}
 
