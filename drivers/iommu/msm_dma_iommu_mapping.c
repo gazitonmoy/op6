@@ -15,7 +15,7 @@ struct msm_iommu_map {
 	struct device *dev;
 	struct msm_iommu_meta *meta;
 	struct list_head lnode;
-	struct scatterlist *sgl;
+	struct scatterlist sgl;
 	enum dma_data_direction dir;
 	unsigned int nents;
 	atomic_t refcount;
@@ -113,6 +113,12 @@ static void msm_iommu_meta_put(struct msm_iommu_meta *meta, int count)
 	kfree(meta);
 }
 
+static void msm_iommu_map_destroy(struct msm_iommu_map *map)
+{
+	dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
+	kfree(map);
+}
+
 static struct msm_iommu_meta *msm_iommu_meta_create(struct dma_buf *dma_buf,
 						    bool get_extra_ref)
 {
@@ -194,7 +200,7 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 		}
 
 		ret = dma_map_sg_attrs(dev, sg, nents, dir, attrs);
-		if (!ret) {
+		if (ret != nents) {
 			kfree(map);
 			goto release_meta;
 		}
@@ -242,17 +248,14 @@ void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
 		return;
 	}
 
-	map->attrs = attrs;
 	map->dir = dir;
 	free_map = atomic_dec_and_test(&map->refcount);
 	if (free_map)
 		list_del(&map->lnode);
 	write_unlock(&meta->lock);
 
-	if (free_map) {
-		dma_unmap_sg_attrs(map->dev, map->sgl, map->nents, map->dir, map->attrs);
-		kfree(map);
-	}
+	if (free_map)
+		msm_iommu_map_destroy(map);
 
 	msm_iommu_meta_put(meta, 1);
 }
@@ -286,11 +289,9 @@ int msm_dma_unmap_all_for_dev(struct device *dev)
 	}
 	read_unlock(&rb_tree_lock);
 
-	list_for_each_entry_safe(map, map_next, &unmap_list, lnode) {
-		dma_unmap_sg(map->dev, map->sgl, map->nents, map->dir);
-		kfree(map);
-	}
-
+	list_for_each_entry_safe(map, map_next, &unmap_list, lnode)
+		msm_iommu_map_destroy(map);
+	
 	return ret;
 }
 
@@ -315,10 +316,8 @@ void msm_dma_buf_freed(void *buffer)
 	}
 	write_unlock(&meta->lock);
 
-	list_for_each_entry_safe(map, map_next, &unmap_list, lnode) {
-		dma_unmap_sg(map->dev, map->sgl, map->nents, map->dir);
-		kfree(map);
-	}
+	list_for_each_entry_safe(map, map_next, &unmap_list, lnode)
+		msm_iommu_map_destroy(map);
 
 	msm_iommu_meta_put(meta, 1);
 }
