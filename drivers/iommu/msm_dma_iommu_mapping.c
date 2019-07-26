@@ -17,8 +17,8 @@ struct msm_iommu_map {
 	struct list_head lnode;
 	struct scatterlist sgl;
 	enum dma_data_direction dir;
-	unsigned int nents;
 	atomic_t refcount;
+	unsigned int nents;
 	unsigned long attrs;
 	dma_addr_t buf_start_addr;
 };
@@ -115,6 +115,7 @@ static void msm_iommu_meta_put(struct msm_iommu_meta *meta)
 
 static void msm_iommu_map_destroy(struct msm_iommu_map *map)
 {
+	list_del(&map->lnode);
 	dma_unmap_sg(map->dev, &map->sgl, map->nents, map->dir);
 	kfree(map);
 }
@@ -123,7 +124,7 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 			 enum dma_data_direction dir, struct dma_buf *dma_buf,
 			 unsigned long attrs)
 {
-	int not_lazy  = !(attrs & DMA_ATTR_NO_DELAYED_UNMAP);
+	int not_lazy  = (attrs & DMA_ATTR_NO_DELAYED_UNMAP);
 	struct msm_iommu_meta *meta;
 	struct msm_iommu_map *map;
 
