@@ -372,6 +372,9 @@ static void gmu_kmem_close(struct gmu_device *gmu)
 	if (!ctx->domain)
 		return;
 
+	if (!ctx->domain)
+		return;
+
 	/* Unmap and free all memories in GMU kernel memory pool */
 	for (i = 0; i < GMU_KERNEL_ENTRIES; i++) {
 		struct gmu_memdesc *memptr = &gmu_kmem_entries[i];
