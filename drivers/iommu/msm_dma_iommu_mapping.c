@@ -69,6 +69,7 @@ static struct msm_iommu_meta *msm_iommu_meta_lookup(void *buffer)
 		} else if (buffer > meta->buffer) {
 			p = &(*p)->rb_right;
 		} else {
+			atomic_inc(&meta->refcount);
 			read_unlock(&rb_tree_lock);
 			return meta;
 		}
@@ -99,18 +100,19 @@ static struct msm_iommu_map *msm_iommu_map_lookup(struct msm_iommu_meta *meta,
 	return NULL;
 }
 
-static void msm_iommu_meta_put(struct msm_iommu_meta *meta)
+static void msm_iommu_meta_put(struct msm_iommu_meta *meta, int count)
 {
 	struct rb_root *root = &iommu_root;
-
-	if (atomic_dec_return(&meta->refcount))
-		return;
+	bool free_meta;
 
 	write_lock(&rb_tree_lock);
-	rb_erase(&meta->node, root);
+	free_meta = atomic_sub_and_test(count, &meta->refcount);
+	if (free_meta)
+		rb_erase(&meta->node, root);
 	write_unlock(&rb_tree_lock);
 
-	kfree(meta);
+	if (free_meta)
+		kfree(meta);
 }
 
 static void msm_iommu_map_destroy(struct msm_iommu_map *map)
@@ -130,15 +132,13 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 
 	meta = msm_iommu_meta_lookup(dma_buf->priv);
 	if (meta) {
-		atomic_inc(&meta->refcount);
 		read_lock(&meta->lock);
 		map = msm_iommu_map_lookup(meta, dev);
 		if (map)
 			atomic_inc(&map->refcount);
 		read_unlock(&meta->lock);
 	} else {
-		while (!(meta = kmalloc(sizeof(*meta), GFP_KERNEL)));
-
+		meta = kmalloc(sizeof(*meta), GFP_KERNEL | __GFP_NOFAIL);
 		*meta = (typeof(*meta)){
 			.buffer = dma_buf->priv,
 			.refcount = ATOMIC_INIT(2 - not_lazy),
@@ -156,9 +156,9 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 		if (is_device_dma_coherent(dev))
 			dmb(ish);
 	} else {
-		while (!(map = kmalloc(sizeof(*map), GFP_KERNEL)));
 		while (!dma_map_sg_attrs(dev, sg, nents, dir, attrs));
 
+		map = kmalloc(sizeof(*map), GFP_KERNEL | __GFP_NOFAIL);
 		*map = (typeof(*map)){
 			.dev = dev,
 			.dir = dir,
@@ -195,6 +195,7 @@ void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
 	map = msm_iommu_map_lookup(meta, dev);
 	if (!map) {
 		write_unlock(&meta->lock);
+		msm_iommu_meta_put(meta, 1);
 		return;
 	}
 
@@ -207,7 +208,7 @@ void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
 	if (free_map)
 		msm_iommu_map_destroy(map);
 
-	msm_iommu_meta_put(meta);
+	msm_iommu_meta_put(meta, 2);
 }
 
 int msm_dma_unmap_all_for_dev(struct device *dev)
@@ -269,5 +270,5 @@ void msm_dma_buf_freed(void *buffer)
 	list_for_each_entry_safe(map, map_next, &unmap_list, lnode)
 		msm_iommu_map_destroy(map);
 
-	msm_iommu_meta_put(meta);
+	msm_iommu_meta_put(meta, 2);
 }
