@@ -726,9 +726,10 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	}
 
 	dsi = &panel->mipi_device;
-	if (panel->is_hbm_enabled){
+
+	if (panel->is_hbm_enabled)
 		return 0;
-		}
+
 	if (op_dimlayer_bl_enabled != op_dimlayer_bl_enable_real) {
 		op_dimlayer_bl_enable_real = op_dimlayer_bl_enabled;
 		if (op_dimlayer_bl_enable_real) {
@@ -740,10 +741,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	}
 	if (op_dimlayer_bl_enable_real) {
 		bl_lvl = op_dimlayer_bl_alpha;
-    }
-    if (panel->bl_config.bl_high2bit){
-	if(HBM_flag==true){
-		return 0;
+    	}
 
 	if (panel->bl_config.bl_high2bit) {
 		if (HBM_flag)
