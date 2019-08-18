@@ -398,6 +398,7 @@ struct fastrpc_file {
 	int refcount;
 	/* Identifies the device (MINOR_NUM_DEV / MINOR_NUM_SECURE_DEV) */
 	int dev_minor;
+	char *debug_buf;
 };
 
 static struct fastrpc_apps gfa;
@@ -3021,11 +3022,11 @@ static ssize_t fastrpc_debugfs_read(struct file *filp, char __user *buffer,
 				 DEBUGFS_SIZE - len, "|%-14d",
 				 chan->issubsystemup);
 			len += scnprintf(fileinfo + len,
-					DEBUGFS_SIZE - len, "%s %d\n",
-					"secure:", chan->secure);
+				 DEBUGFS_SIZE - len, "|%-9d",
+				 chan->ssrcount);
 			len += scnprintf(fileinfo + len,
-					DEBUGFS_SIZE - len, "%s %d\n",
-					"sesscount:", chan->sesscount);
+				 DEBUGFS_SIZE - len, "%s %d\n",
+				"secure:", chan->secure);
 			for (j = 0; j < chan->sesscount; j++) {
 				sess_used += chan->session[j].used;
 				}
@@ -3081,17 +3082,55 @@ static ssize_t fastrpc_debugfs_read(struct file *filp, char __user *buffer,
 		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
 			"%s %7s %d\n", "sessionid", ":", fl->sessionid);
 		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %8s %d\n", "ssrcount", ":", fl->ssrcount);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %8s %d\n", "refcount", ":", fl->refcount);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %14s %d\n", "pd", ":", fl->pd);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %9s %s\n", "spdname", ":", fl->spdname);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %6s %d\n", "file_close", ":", fl->file_close);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %8s %d\n", "sharedcb", ":", fl->sharedcb);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %9s %d\n", "profile", ":", fl->profile);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %3s %d\n", "smmu.coherent", ":",
+			fl->sctx->smmu.coherent);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %4s %d\n", "smmu.enabled", ":",
+			fl->sctx->smmu.enabled);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %9s %d\n", "smmu.cb", ":", fl->sctx->smmu.cb);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %5s %d\n", "smmu.secure", ":",
+			fl->sctx->smmu.secure);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %5s %d\n", "smmu.faults", ":",
+			fl->sctx->smmu.faults);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s %s %d\n", "link.link_state",
+		 ":", *&me->channel[fl->cid].link.link_state);
+
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"\n=======%s %s %s======\n", title,
+			" LIST OF MAPS ", title);
+
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%-20s|%-20s|%-20s\n", "va", "phys", "size");
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"%s%s%s%s%s\n",
+			single_line, single_line, single_line,
+			single_line, single_line);
+		hlist_for_each_entry_safe(map, n, &fl->maps, hn) {
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
+			"0x%-20lX|0x%-20llX|0x%-20zu\n\n",
+			map->va, map->phys,
+			map->size);
+		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
 				"%s %d\n\n",
 				"DEV_MINOR:", fl->dev_minor);
-		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
-				"%s\n",
-				"LIST OF BUFS:");
-		spin_lock(&fl->hlock);
-		hlist_for_each_entry_safe(buf, n, &fl->bufs, hn) {
-			len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
-					"%s %pK %s %pK %s %llx\n", "buf:",
-					buf, "buf->virt:", buf->virt,
-					"buf->phys:", buf->phys);
 		}
 		len += scnprintf(fileinfo + len, DEBUGFS_SIZE - len,
 			"%-20s|%-20s|%-20s|%-20s\n",
@@ -3276,19 +3315,6 @@ static int fastrpc_device_open(struct inode *inode, struct file *filp)
 		return err;
 	}
 
-	/*
-	 * Indicates the device node opened
-	 * MINOR_NUM_DEV or MINOR_NUM_SECURE_DEV
-	 */
-	int dev_minor = MINOR(inode->i_rdev);
-
-	VERIFY(err, ((dev_minor == MINOR_NUM_DEV) ||
-			(dev_minor == MINOR_NUM_SECURE_DEV)));
-	if (err) {
-		pr_err("adsprpc: Invalid dev minor num %d\n", dev_minor);
-		return err;
-	}
-
 	VERIFY(err, NULL != (fl = kzalloc(sizeof(*fl), GFP_KERNEL)));
 	if (err)
 		return err;
@@ -3341,7 +3367,8 @@ static int fastrpc_get_info(struct fastrpc_file *fl, uint32_t *info)
 		if (err)
 			goto bail;
 		/* Check to see if the device node is non-secure */
-		if (fl->dev_minor == MINOR_NUM_DEV) {
+		if (fl->dev_minor == MINOR_NUM_DEV &&
+			fl->apps->secure_flag == true) {
 			/*
 			 * For non secure device node check and make sure that
 			 * the channel allows non-secure access
@@ -3989,10 +4016,13 @@ static int fastrpc_probe(struct platform_device *pdev)
 			VERIFY(err, !of_property_read_u32(dev->of_node,
 					  "qcom,secure-domains",
 			      &secure_domains));
-			if (!err)
+			if (!err) {
+				me->secure_flag = true;
 				configure_secure_channels(secure_domains);
-			else
+			} else {
+				me->secure_flag = false;
 				pr_info("adsprpc: unable to read the domain configuration from dts\n");
+			}
 		}
 	}
 	if (of_device_is_compatible(dev->of_node,
