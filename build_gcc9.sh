@@ -8,7 +8,7 @@ restore='\033[0m'
 
 clear
 
-# Resources
+# Resources new
 THREAD="-j$(grep -c ^processor /proc/cpuinfo)"
 KERNEL="Image"
 DTBIMAGE="dtb"
