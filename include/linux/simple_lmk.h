@@ -13,11 +13,6 @@
 #ifndef _SIMPLE_LMK_H_
 #define _SIMPLE_LMK_H_
 
-#define LMK_KSWAPD_TIMEOUT (msecs_to_jiffies(CONFIG_ANDROID_SIMPLE_LMK_KSWAPD_TIMEOUT))
-#define LMK_OOM_TIMEOUT (msecs_to_jiffies(CONFIG_ANDROID_SIMPLE_LMK_OOM_TIMEOUT))
-
-void simple_lmk_force_reclaim(void);
-void simple_lmk_start_reclaim(void);
-void simple_lmk_stop_reclaim(void);
+void simple_lmk_mem_reclaim(void);
 
 #endif /* _SIMPLE_LMK_H_ */
