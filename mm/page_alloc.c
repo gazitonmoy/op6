@@ -3833,21 +3833,6 @@ retry:
 		goto nopage;
 
 
-#ifdef CONFIG_ANDROID_SIMPLE_LMK
-	if (gfp_mask & __GFP_NORETRY) {
-		simple_lmk_mem_reclaim();
-		goto nopage;
-	}
-
-	while (1) {
-		simple_lmk_mem_reclaim();
-		page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
-		if (page)
-			goto got_pg;
-		cond_resched();
-	}
-#endif
-
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
