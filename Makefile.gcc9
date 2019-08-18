@@ -304,7 +304,7 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = $(CCACHE) gcc
 HOSTCXX      = $(CCACHE) g++
-HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
+HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89 -pipe
 HOSTCXXFLAGS = -O2
 
 ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
@@ -404,7 +404,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 # Optimization for sdm845
 KBUILD_CFLAGS	+= -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common -fshort-wchar -std=gnu89 $(call cc-option,-fno-PIE) \
-		   -mcpu=cortex-a75.cortex-a55+crypto -mtune=cortex-a75.cortex-a55 -fdiagnostics-color=always \
+		   -mcpu=cortex-a75.cortex-a55+crypto -mtune=cortex-a75.cortex-a55 -fdiagnostics-color=always -ftree-vectorize -pipe\
 		   -Wno-attribute-alias -fno-common -fshort-wchar -floop-nest-optimize -fgraphite-identity \
 		   -ftree-loop-distribution -floop-parallelize-all -floop-interchange -floop-block \
 		   -floop-strip-mine -ffast-math -fgcse-sm -fipa-pta -foptimize-sibling-calls \
