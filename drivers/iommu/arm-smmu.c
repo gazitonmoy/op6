@@ -460,7 +460,7 @@ struct arm_smmu_device {
 	struct arm_smmu_smr		*smrs;
 	struct arm_smmu_s2cr		*s2crs;
 	struct mutex			stream_map_mutex;
-
+	struct mutex			iommu_group_mutex;
 	unsigned long			va_size;
 	unsigned long			ipa_size;
 	unsigned long			pa_size;
@@ -2308,6 +2308,7 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	struct iommu_group *group;
 	int i, idx, ret;
 
+	mutex_lock(&smmu->iommu_group_mutex);
 	mutex_lock(&smmu->stream_map_mutex);
 	/* Figure out a viable stream map entry allocation */
 	for_each_cfg_sme(fwspec, i, idx) {
@@ -2316,12 +2317,12 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 
 		if (idx != INVALID_SMENDX) {
 			ret = -EEXIST;
-			goto out_err;
+			goto sme_err;
 		}
 
 		ret = arm_smmu_find_sme(smmu, sid, mask);
 		if (ret < 0)
-			goto out_err;
+			goto sme_err;
 
 		idx = ret;
 		if (smrs && smmu->s2crs[idx].count == 0) {
@@ -2332,13 +2333,14 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 		smmu->s2crs[idx].count++;
 		cfg->smendx[i] = (s16)idx;
 	}
+	mutex_unlock(&smmu->stream_map_mutex);
 
 	group = iommu_group_get_for_dev(dev);
 	if (!group)
 		group = ERR_PTR(-ENOMEM);
 	if (IS_ERR(group)) {
 		ret = PTR_ERR(group);
-		goto out_err;
+		goto iommu_group_err;
 	}
 	iommu_group_put(group);
 
@@ -2346,15 +2348,19 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	for_each_cfg_sme(fwspec, i, idx)
 		smmu->s2crs[idx].group = group;
 
-	mutex_unlock(&smmu->stream_map_mutex);
+	mutex_unlock(&smmu->iommu_group_mutex);
 	return 0;
 
-out_err:
+iommu_group_err:
+	mutex_lock(&smmu->stream_map_mutex);
+
+sme_err:
 	while (i--) {
 		arm_smmu_free_sme(smmu, cfg->smendx[i]);
 		cfg->smendx[i] = INVALID_SMENDX;
 	}
 	mutex_unlock(&smmu->stream_map_mutex);
+	mutex_unlock(&smmu->iommu_group_mutex);
 	return ret;
 }
 
@@ -4103,14 +4109,13 @@ static int arm_smmu_parse_impl_def_registers(struct arm_smmu_device *smmu)
 		return -EINVAL;
 	}
 
-	regs = devm_kmalloc_array(
-		dev, ntuples, sizeof(*smmu->impl_def_attach_registers),
+	regs = devm_kmalloc(
+		dev, sizeof(*smmu->impl_def_attach_registers) * ntuples,
 		GFP_KERNEL);
 	if (!regs)
 		return -ENOMEM;
 
-	tuples = devm_kmalloc(dev, array3_size(sizeof(u32), ntuples, 2),
-			      GFP_KERNEL);
+	tuples = devm_kmalloc(dev, sizeof(u32) * ntuples * 2, GFP_KERNEL);
 	if (!tuples)
 		return -ENOMEM;
 
@@ -4148,8 +4153,8 @@ static int arm_smmu_init_clocks(struct arm_smmu_power_resources *pwr)
 		return 0;
 	}
 
-	pwr->clocks = devm_kcalloc(
-		dev, pwr->num_clocks, sizeof(*pwr->clocks),
+	pwr->clocks = devm_kzalloc(
+		dev, sizeof(*pwr->clocks) * pwr->num_clocks,
 		GFP_KERNEL);
 
 	if (!pwr->clocks)
@@ -4259,8 +4264,8 @@ static int arm_smmu_init_regulators(struct arm_smmu_power_resources *pwr)
 		return 0;
 	}
 
-	pwr->gdscs = devm_kcalloc(
-			dev, pwr->num_gdscs, sizeof(*pwr->gdscs), GFP_KERNEL);
+	pwr->gdscs = devm_kzalloc(
+			dev, sizeof(*pwr->gdscs) * pwr->num_gdscs, GFP_KERNEL);
 
 	if (!pwr->gdscs)
 		return -ENOMEM;
@@ -4481,6 +4486,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 
 	smmu->num_mapping_groups = size;
 	mutex_init(&smmu->stream_map_mutex);
+	mutex_init(&smmu->iommu_group_mutex);
 
 	if (smmu->version < ARM_SMMU_V2 || !(id & ID0_PTFS_NO_AARCH32)) {
 		smmu->features |= ARM_SMMU_FEAT_FMT_AARCH32_L;
@@ -4727,7 +4733,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	smmu->irqs = devm_kcalloc(dev, num_irqs, sizeof(*smmu->irqs),
+	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
 				  GFP_KERNEL);
 	if (!smmu->irqs) {
 		dev_err(dev, "failed to allocate %d irqs\n", num_irqs);
@@ -5581,7 +5587,7 @@ static int qsmmuv500_parse_errata1(struct arm_smmu_device *smmu)
 	if (len < 0)
 		return 0;
 
-	smrs = devm_kcalloc(dev, len, sizeof(*smrs), GFP_KERNEL);
+	smrs = devm_kzalloc(dev, sizeof(*smrs) * len, GFP_KERNEL);
 	if (!smrs)
 		return -ENOMEM;
 
@@ -5612,7 +5618,7 @@ static int qsmmuv500_read_actlr_tbl(struct arm_smmu_device *smmu)
 	if (len < 0)
 		return 0;
 
-	actlrs = devm_kcalloc(dev, len, sizeof(*actlrs), GFP_KERNEL);
+	actlrs = devm_kzalloc(dev, sizeof(*actlrs) * len, GFP_KERNEL);
 	if (!actlrs)
 		return -ENOMEM;
 
