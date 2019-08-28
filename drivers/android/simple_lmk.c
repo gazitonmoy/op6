@@ -14,6 +14,7 @@
 #include <linux/version.h>
 #include <uapi/linux/sysinfo.h>
 #include <linux/devfreq_boost.h>
+#include <linux/devfreq_boost_ddr.h>
 #include <linux/cpu_input_boost.h>
 
 /* The sched_param struct is located elsewhere in newer kernels */
@@ -187,6 +188,7 @@ static void scan_and_kill(unsigned long pages_needed)
 	cpu_input_boost_kick_cluster1(50);
 	cpu_input_boost_kick_cluster2(50);
 	devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 50);
+	devfreq_boost_ddr_kick_max(DEVFREQ_MSM_DDRBW, 50);
 	read_lock(&tasklist_lock);
 	for (i = 0; i < ARRAY_SIZE(adj_prio); i++) {
 		pages_found += find_victims(victims, &nr_victims, MAX_VICTIMS,

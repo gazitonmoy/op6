@@ -79,6 +79,8 @@
 #include <linux/kcov.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
+#include <linux/devfreq_boost_ddr.h>
+#include <linux/devfreq_boost_gpu.h>
 #include <linux/adj_chain.h>
 #include <linux/simple_lmk.h>
 
@@ -2009,7 +2011,9 @@ long _do_fork(unsigned long clone_flags,
 		if (task_is_zygote(current)) {
 			cpu_input_boost_kick_cluster1(750);
 			cpu_input_boost_kick_cluster2(750);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 750);
+			devfreq_boost_ddr_kick_max(DEVFREQ_MSM_DDRBW, 750);
+			devfreq_boost_gpu_kick_max(DEVFREQ_MSM_GPUBW, 750);
 		}
 	}
 #endif	

@@ -37,7 +37,6 @@
 #include <linux/regulator/consumer.h>
 #include <linux/input.h>
 #include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
 //#include <linux/wakelock.h>
 #include "../fingerprint_detect/fingerprint_detect.h"
 

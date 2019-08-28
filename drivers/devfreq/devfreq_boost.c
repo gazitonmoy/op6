@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2018-2019 Sultan Alsawaf <sultan@kerneltoast.com>.
  */
+// Copyright (C) 2019 all additions Erik Müller <pappschlumpf@xda>
 
 #define pr_fmt(fmt) "devfreq_boost: " fmt
 

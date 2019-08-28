@@ -25,7 +25,6 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
 
 #include <drm/drm_bridge.h>
 #include <drm/drmP.h>

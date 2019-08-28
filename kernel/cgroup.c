@@ -65,9 +65,9 @@
 #include <linux/binfmts.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
+#include <linux/devfreq_boost_ddr.h>
+#include <linux/devfreq_boost_gpu.h>
 #include <net/sock.h>
-#include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/cgroup.h>
@@ -2982,7 +2982,9 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 				cpu_input_boost_kick_cluster1(1250);
 			else
 				cpu_input_boost_kick_cluster2(1250);
-			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 100);
+			devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
+			devfreq_boost_ddr_kick_max(DEVFREQ_MSM_DDRBW, 1000);
+			devfreq_boost_gpu_kick_max(DEVFREQ_MSM_GPUBW, 1000);
 		}
 	}
 
