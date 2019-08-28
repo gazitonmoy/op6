@@ -16,8 +16,8 @@ DTBIMAGE="dtb"
 #export PATH=${CLANG_PATH}:${PATH}
 #export CLANG_TRIPLE=aarch64-linux-gnu-
 export SPL="2019-08"
-export CROSS_COMPILE=${HOME}/android/Toolchains/gcc9arm64/bin/aarch64-linux-gnu-
-export CROSS_COMPILE_ARM32=${HOME}/android/Toolchains/gcc9eabi/bin/arm-eabi-
+export CROSS_COMPILE=${HOME}/android/Toolchains/gcc9arm64_92/bin/aarch64-elf-
+export CROSS_COMPILE_ARM32=${HOME}/android/Toolchains/gcc9eabi_92/bin/arm-eabi-
 #export KBUILD_COMPILER_STRING=$(~/android/Toolchains/clang/clang-r328903/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g' -e 's/[[:space:]]*$//')
 DEFCONFIG="smurf_defconfig"
 
