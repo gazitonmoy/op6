@@ -21,7 +21,6 @@
 #include <linux/debugfs.h>
 #include <linux/ktime.h>
 #include <linux/cpu_input_boost.h>
-#include <linux/devfreq_boost.h>
 #include <uapi/drm/sde_drm.h>
 #include <drm/drm_mode.h>
 #include <drm/drm_crtc.h>
