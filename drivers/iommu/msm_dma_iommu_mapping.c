@@ -151,10 +151,26 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 	}
 
 	if (map) {
-		sg->dma_address = map->sgl.dma_address;
-		sg->dma_length = map->sgl.dma_length;
-		if (is_device_dma_coherent(dev))
-			dmb(ish);
+		if (nents == map->nents &&
+		    dir == map->dir &&
+		    attrs == map->attrs &&
+		    sg_phys(sg) == map->buf_start_addr) {
+			sg->dma_address = map->sgl.dma_address;
+			sg->dma_length = map->sgl.dma_length;
+			if (is_device_dma_coherent(dev))
+				dmb(ish);
+		} else {
+			bool start_diff = sg_phys(sg) != map->buf_start_addr;
+
+			dev_err(dev, "lazy map request differs:\n"
+				"req dir:%d, original dir:%d\n"
+				"req nents:%d, original nents:%d\n"
+				"req map attrs:%lu, original map attrs:%lu\n"
+				"req buffer start address differs:%d\n",
+				dir, map->dir, nents, map->nents, attrs,
+				map->attrs, start_diff);
+			goto release_meta;
+		}
 	} else {
 		while (!dma_map_sg_attrs(dev, sg, nents, dir, attrs));
 
@@ -178,6 +194,10 @@ int msm_dma_map_sg_attrs(struct device *dev, struct scatterlist *sg, int nents,
 	}
 
 	return nents;
+
+release_meta:
+	msm_iommu_meta_put(meta, 2);
+	return -EINVAL;
 }
 
 void msm_dma_unmap_sg(struct device *dev, struct scatterlist *sgl, int nents,
