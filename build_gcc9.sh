@@ -22,7 +22,7 @@ export CROSS_COMPILE_ARM32=${HOME}/android/Toolchains/gcc9eabi_92/bin/arm-eabi-
 DEFCONFIG="smurf_defconfig"
 
 # Kernel Details
-VER=".2.0.75"
+VER=".2.0.76"
 
 # Paths
 KERNEL_DIR=`pwd`
